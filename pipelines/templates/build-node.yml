@@ -155,8 +155,12 @@ jobs:
       command: custom
       workingDir: web
       customCommand: run test:integration:ci
+    # All test configuration is passed through env only (nothing is hard-coded in the tests).
+    # UseDevelopmentStorage=true is the public Azurite shortcut, not a secret.
+    # The tests create their own random-named containers/queue/tables and delete them afterwards.
     env:
       STORAGE_CONNECTION_STRING: UseDevelopmentStorage=true
+      INTEGRATION_REQUIRED: 'true'   # fail instead of silently skipping if the emulator config is missing
 
   - task: PublishTestResults@2
     displayName: Publish integration results
