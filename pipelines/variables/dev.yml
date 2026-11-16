@@ -1,4 +1,4 @@
-# Environment: dev  (dev: shares the dev resources (same RG/app/storage as dev), only APP_ENV=dev differs)
+# Environment: dev  (only active environment)
 # Resource names must match the Bicep in the infra repo: <prefix>-<resourceEnv>-web / -func / -apim.
 variables:
   environment: dev

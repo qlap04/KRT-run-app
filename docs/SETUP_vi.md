@@ -23,12 +23,12 @@ Luồng nghiệp vụ: Nhân viên upload ảnh + km + ngày chạy → web lưu
 
 | Biến | Ý nghĩa | Ví dụ |
 |---|---|---|
-| `APP_ENV` | Tên môi trường (dev/sit/uat/preprod/prod) | `dev` |
+| `APP_ENV` | Tên môi trường (hiện dùng `dev`; app vẫn nhận sit/uat/preprod/prod để sau này mở rộng) | `dev` |
 | `STORAGE_ACCOUNT_NAME` | Tên storage trên Azure (dùng managed identity) | `stkrtrundevab12cd` |
 | `QUEUE_NAME` | Tên queue | `upload-jobs` |
 | `BLOB_CONTAINER_INCOMING` / `BLOB_CONTAINER_PROOFS` | Tên container | `incoming` / `proofs` |
 | `TABLE_USERS` / `TABLE_RUNS` / `TABLE_AUDIT` | Tên table | `Users` / `Runs` / `AuditLog` |
-| `SESSION_SECRET` | Khoá ký session (**secret**, bắt buộc ở prod) | chuỗi ngẫu nhiên dài |
+| `SESSION_SECRET` | Khoá ký session (**secret**, bắt buộc khi `APP_ENV=prod`) | chuỗi ngẫu nhiên dài |
 | `ADMIN_CODE` | Mã nhân viên đăng ký đầu tiên sẽ thành admin (**secret**) | `ADMIN01` |
 | `API_KEY` | Key cho APIM gọi `/api/*` qua header `x-api-key` (**secret**) | chuỗi ngẫu nhiên |
 
@@ -40,26 +40,20 @@ Luồng nghiệp vụ: Nhân viên upload ảnh + km + ngày chạy → web lưu
 
 ```mermaid
 flowchart LR
-  A["Nhánh Git<br/>(develop / release / main / hotfix)<br/>+ parameter targetEnvironment"] --> B["Stage template<br/>environment = dev|sit|uat|preprod|prod"]
-  B --> C["variables/&lt;env&gt;.yml<br/>(+ common.yml)<br/>RG, location, sku, tên app"]
-  B --> G["Variable group krtrun-&lt;env&gt;<br/>SESSION_SECRET, ADMIN_CODE, API_KEY"]
-  C --> D["Bicep deploy<br/>env/&lt;env&gt;.bicepparam"]
-  G -->|"biến môi trường của task<br/>readEnvironmentVariable()"| D
-  D --> E["Bicep: app settings<br/>APP_ENV, STORAGE_ACCOUNT_NAME, ..."]
-  E --> F["Web App / Function App<br/>process.env.APP_ENV ..."]
+  A["Nhánh Git develop"] --> B["Stage DeployDev<br/>environment = dev"]
+  B --> C["variables/dev.yml<br/>(+ common.yml)<br/>RG, tên app"]
+  C --> E["Tên web app / function / APIM<br/>để deploy code"]
+  E --> F["Web App / Function App"]
 ```
 
 Giải thích dễ hiểu (giống việc **gọi món ăn**):
-1. **Nhánh Git** là "bàn nào gọi món". Pipeline nhìn tên nhánh để biết phải chạy môi trường nào (hotfix thì bạn chọn tay bằng `targetEnvironment`).
-2. Mỗi stage mang tên môi trường, rồi **tự nạp file `variables/<env>.yml`** của đúng môi trường đó (tên resource group, region, SKU, tên web app...). Phần dùng chung nằm ở `common.yml`.
-3. **Secret không nằm trong repo.** Chúng nằm trong *variable group* `krtrun-<env>` trên Azure DevOps. Task chuyển chúng thành biến môi trường, file `.bicepparam` đọc bằng `readEnvironmentVariable('SESSION_SECRET', '')`.
-4. Mọi giá trị tham số hạ tầng nằm trong file `env/<env>.bicepparam`; `variables/<env>.yml` chỉ giữ tên resource để pipeline dùng, nên phải khớp với bicepparam.
-5. Bicep ghi các giá trị đó vào **app settings** của Web App và Function App.
-6. Khi chạy, Azure đưa app settings vào **`process.env`**, và `web/src/config` đọc ra.
+1. **Nhánh Git** là "bàn nào gọi món". Hiện chỉ có nhánh `develop`, pipeline chạy Build rồi deploy **DEV**.
+2. Stage DeployDev **tự nạp file `variables/dev.yml`** (tên resource group, region, tên web app...) và phần dùng chung ở `common.yml`.
+3. **Secret không nằm trong repo app.** Chúng thuộc *variable group* `krtrun-dev` trên Azure DevOps, do pipeline provision ở repo `infra` ghi vào app settings.
+4. Repo `app` chỉ cần biết **tên** web app / function app / APIM để deploy code (nằm trong `pipelines/variables/dev.yml`). Các tên này phải khớp Bicep: `<prefix>-<resourceEnv>-web|func|apim`.
+5. Khi chạy, Azure đưa app settings vào **`process.env`**, và `web/src/config` đọc ra.
 
-> **Lưu ý quan trọng:** `sit`, `uat`, `preprod` dùng **chung tài nguyên của dev** (cùng RG, web app, storage). Mỗi lần provision môi trường nào thì `APP_ENV` của web app dev bị đổi thành tên môi trường đó (bản provision cuối cùng thắng). Đây là cách tiết kiệm tiền khi đang học. Khi cần tách thật, đổi `resourceEnv` và tên trong `variables/<env>.yml` + `env/<env>.bicepparam`.
-
-> **Chia việc giữa 2 repo:** app settings (`APP_ENV`, `STORAGE_ACCOUNT_NAME`, secret...) được **repo `infra`** ghi lên Azure khi chạy pipeline provision. Repo `app` chỉ cần biết **tên** web app / function app / APIM để deploy code (nằm trong `pipelines/variables/<env>.yml`). Các tên này phải khớp Bicep: `<prefix>-<resourceEnv>-web|func|apim`.
+> **Chia việc giữa 2 repo:** app settings (`APP_ENV`, `STORAGE_ACCOUNT_NAME`, secret...) được **repo `infra`** ghi lên Azure khi chạy pipeline provision. Repo `app` chỉ cần biết **tên** web app / function app / APIM để deploy code. Các tên này phải khớp Bicep: `<prefix>-<resourceEnv>-web|func|apim`.
 
 ---
 
@@ -70,48 +64,32 @@ flowchart TD
   subgraph develop
     D1[Build] --> D2[DEV]
   end
-  subgraph "release/*"
-    R1[Build] --> R2[SIT] --> R3[UAT]
-  end
-  subgraph main
-    M1[Build] --> M2[PREPROD] --> M3[PROD]
-  end
-  subgraph "hotfix/*"
-    H1[Build] --> H2["môi trường chọn tay<br/>(targetEnvironment)"] --> H3[PROD]
-  end
 ```
 
 | Nhánh | Các stage chạy (tuần tự) | Approval |
 |---|---|---|
-| `develop` | Build → **DEV** | không |
-| `release/*` | Build → **SIT** → **UAT** | UAT |
-| `main` | Build → **PREPROD** → **PROD** | PREPROD, PROD |
-| `hotfix/*` | Build → **targetEnvironment** (dev/sit/uat/preprod, mặc định dev) → **PROD** | môi trường uat/preprod nếu chọn, và PROD |
+| `develop` | Build → **DEV** | Environment `krtrun-dev` |
 
-Pipeline `pipelines/app-deploy.yml` của repo này theo quy tắc trên (pipeline provision ở repo `infra` có quy tắc giống hệt). Build chỉ chạy **một lần**, các stage deploy dùng lại artifact. Stage deploy là *template* dùng lại: `pipelines/templates/build-node.yml`, `pipelines/templates/deploy-app.yml`.
-Approval **không** nằm trong YAML: bạn vào Azure DevOps → Pipelines → Environments → `krtrun-<env>` → Approvals and checks.
+Hiện chỉ môi trường **dev** đang dùng. Pipeline `pipelines/app-deploy.yml` của repo này theo quy tắc trên (pipeline provision ở repo `infra` cũng vậy). Build chỉ chạy **một lần**, stage deploy dùng lại artifact. Stage deploy là *template* dùng lại: `pipelines/templates/build-node.yml`, `pipelines/templates/deploy-app.yml`.
+Approval **không** nằm trong YAML: bạn vào Azure DevOps → Pipelines → Environments → `krtrun-dev` → Approvals and checks, rồi bật Approvals.
+
+Nhánh tính năng (`feature/<tên>`) cắt từ `develop` và merge lại bằng pull request.
+
+> **Sau này muốn thêm môi trường:** thêm file `pipelines/variables/<env>.yml`, thêm một stage trong pipeline, rồi tạo Environment (và variable group nếu cần) trên Azure DevOps. Ở repo `infra` còn phải thêm `bicep/env/<env>.bicepparam` và một stage provision.
 
 ---
 
 ## 4. Thiết lập Azure DevOps cho repo app (làm một lần)
 
-1. **Tạo repo `app` trên Azure DevOps** rồi đẩy code:
-   ```bash
-   cd app
-   git remote add origin <URL repo app>
-   git add . && git commit -m "init KRT-run app"
-   git branch -M main && git push -u origin main
-   git checkout -b develop && git push -u origin develop
-   ```
-   (Repo này đã `git init -b develop`, chưa có commit. Nhớ tạo nhánh `main` trước khi dùng luồng release.)
-2. **Service connection** (Project settings → Service connections → *Azure Resource Manager* → **Workload identity federation**): `sc-krtrun-dev`, dùng chung cho mọi môi trường (khớp `serviceConnection` trong `pipelines/variables/<env>.yml`). Có thể dùng chung với repo `infra` nếu cùng project; cần quyền deploy web app / function app / APIM (Contributor trên resource group là đủ).
-3. **Environments**: `krtrun-dev`, `krtrun-sit`, `krtrun-uat`, `krtrun-preprod`, `krtrun-prod`; thêm **Approvals** cho `uat`, `preprod`, `prod` (Approvals and checks).
-4. **Tạo pipeline** (Pipelines → New → Azure Repos Git → *Existing Azure Pipelines YAML file*): `krtrun-app-deploy` → `/pipelines/app-deploy.yml`.
-5. **Điều kiện trước khi chạy**: repo `infra` đã chạy provision cho môi trường tương ứng (nếu chưa có web app thì deploy sẽ lỗi).
-6. **Chạy**: merge vào `develop` → pipeline build + test, deploy web + function, import API vào APIM, smoke test `/api/health`.
-7. **Hotfix**: tạo nhánh `hotfix/xxx` từ `main`, push, rồi **Run pipeline** chọn nhánh đó và chọn `targetEnvironment`.
+Code đã nằm trên GitHub, nhánh `develop`: [https://github.com/qlap04/KRT-run-app](https://github.com/qlap04/KRT-run-app). Không cần tạo repo Azure Repos hay push lại.
 
-Secret (`SESSION_SECRET`, `ADMIN_CODE`, `API_KEY`) **không** nằm ở repo app; chúng thuộc variable group `krtrun-<env>` dùng bởi pipeline provision ở repo `infra`.
+1. **Service connection** (Project settings → Service connections → *Azure Resource Manager* → **Workload identity federation**): tạo `sc-krtrun-dev`. Tên phải khớp `serviceConnection` trong `pipelines/variables/dev.yml`. Có thể dùng chung với repo `infra` nếu cùng project; cần quyền deploy web app / function app / APIM (Contributor trên resource group là đủ).
+2. **Environments**: chỉ cần `krtrun-dev`; vào Approvals and checks rồi **bật Approvals**.
+3. **Tạo pipeline** (Pipelines → New pipeline → chọn **GitHub (YAML)** → chọn repo `qlap04/KRT-run-app` → *Existing Azure Pipelines YAML file*): `krtrun-app-deploy` → `/pipelines/app-deploy.yml`. Lần đầu Azure DevOps sẽ xin quyền truy cập GitHub.
+4. **Điều kiện trước khi chạy**: repo `infra` đã chạy provision cho **dev** (nếu chưa có web app thì deploy sẽ lỗi).
+5. **Chạy**: đẩy hoặc merge vào `develop` → pipeline build + test, deploy web + function, import API vào APIM, smoke test `/api/health`. Stage deploy sẽ chờ bạn Approve trên environment `krtrun-dev`.
+
+Secret (`SESSION_SECRET`, `ADMIN_CODE`, `API_KEY`) **không** nằm ở repo app; chúng thuộc variable group `krtrun-dev` dùng bởi pipeline provision ở repo `infra`.
 
 ---
 

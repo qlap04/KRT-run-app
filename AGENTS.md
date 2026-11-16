@@ -19,16 +19,11 @@ Storage: Blob (incoming, proofs), Queue (upload-jobs), Table (Users, Runs, Audit
 - Resource names in `pipelines/variables/<env>.yml` must match the Bicep in the `infra` repo (`<prefix>-<resourceEnv>-web|func|apim`).
 
 ## Environments & Git flow
-5 environments: `dev`, `sit`, `uat`, `preprod`, `prod` (ADO Environment `krtrun-<env>`; approvals on uat/preprod/prod). `sit`/`uat`/`preprod` SHARE the dev resources and differ only in `APP_ENV`; only `prod` has its own.
+Only `dev` is active for now (ADO Environment `krtrun-dev`, with approval). The app still accepts the names `sit`, `uat`, `preprod`, and `prod` in `APP_ENV` so a later environment can be added without changing the config contract.
 
 | Branch | `app-deploy` pipeline runs |
 |---|---|
 | `develop` | Build → DEV |
-| `release/*` | Build → SIT → UAT |
-| `main` | Build → PREPROD → PROD |
-| `hotfix/*` | Build → `targetEnvironment` (chosen manually) → PROD |
 
 - Feature branches start from `develop` (`feature/<name>`) and merge back through a PR.
-- Release: cut `release/x.y` from `develop`; when done merge into `main` and `develop`.
-- Hotfix: cut `hotfix/<name>` from `main`; when done merge into `main` and `develop`.
-- Never push directly to `main` or `develop`.
+- To add an environment later: add `pipelines/variables/<env>.yml`, a deploy stage, plus an Azure DevOps Environment and (if needed) a variable group. In the `infra` repo also add `bicep/env/<env>.bicepparam` and a provision stage.
