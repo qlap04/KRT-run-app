@@ -1,6 +1,5 @@
 # Variables shared by every environment. NO secrets here.
 variables:
-  vmImage: ubuntu-24.04
   nodeVersion: 22.x
   apiPath: krtrun            # APIM: API path (https://<apim>/krtrun/...)
   artifactName: drop
