@@ -1,0 +1,78 @@
+# Deploy web + function + APIM import for one environment.
+parameters:
+- name: stageName
+  type: string
+- name: environment
+  type: string
+- name: dependsOn
+  type: object
+  default: []
+- name: condition
+  type: string
+  default: succeeded()
+
+stages:
+- stage: ${{ parameters.stageName }}
+  displayName: Deploy ${{ upper(parameters.environment) }}
+  dependsOn: ${{ parameters.dependsOn }}
+  condition: ${{ parameters.condition }}
+  variables:
+  - template: ../variables/common.yml
+  - template: ../variables/${{ parameters.environment }}.yml
+  jobs:
+  - deployment: Deploy
+    displayName: Deploy app
+    pool: { vmImage: $(vmImage) }
+    environment: krtrun-${{ parameters.environment }}
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          - download: current
+            artifact: $(artifactName)
+            displayName: Download artifact
+
+          # --- Apps
+          - task: AzureWebApp@1
+            displayName: Web -> $(webAppName)
+            inputs:
+              azureSubscription: $(serviceConnection)
+              appType: webAppLinux
+              appName: $(webAppName)
+              package: $(Pipeline.Workspace)/$(artifactName)/web.zip
+              runtimeStack: NODE|22-lts
+              startUpCommand: node server.js
+
+          - task: AzureFunctionApp@2
+            displayName: Function -> $(functionAppName)
+            inputs:
+              connectedServiceNameARM: $(serviceConnection)
+              appType: functionAppLinux
+              appName: $(functionAppName)
+              package: $(Pipeline.Workspace)/$(artifactName)/function.zip
+              runtimeStack: NODE|22
+
+          # --- APIM + smoke
+          - task: AzureCLI@3
+            displayName: APIM import $(apimName)
+            condition: and(succeeded(), eq(variables['deployApim'], 'true'))
+            inputs:
+              azureSubscription: $(serviceConnection)
+              scriptType: bash
+              scriptLocation: inlineScript
+              inlineScript: |
+                az apim api import \
+                  --resource-group $(resourceGroup) \
+                  --service-name $(apimName) \
+                  --api-id krtrun \
+                  --path $(apiPath) \
+                  --display-name "KRT-run API ($(environment))" \
+                  --specification-format OpenApi \
+                  --specification-path $(Pipeline.Workspace)/$(artifactName)/openapi.yaml \
+                  --service-url https://$(webAppName).azurewebsites.net \
+                  --protocols https
+
+          - script: |
+              curl --fail --silent --show-error --retry 10 --retry-delay 15 --retry-all-errors \
+                https://$(webAppName).azurewebsites.net/api/health
+            displayName: Smoke /api/health

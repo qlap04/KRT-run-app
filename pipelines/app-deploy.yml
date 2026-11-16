@@ -1,0 +1,92 @@
+# KRT-run app deploy (repo: app)
+#
+# Branch → stages
+#   develop   : Build → DEV
+#   release/* : Build → SIT → UAT
+#   main      : Build → PREPROD → PROD
+#   hotfix/*  : Build → <target> → PROD
+#
+# Approvals: Azure DevOps Environments krtrun-<env> (uat / preprod / prod).
+name: krtrun-app-deploy-$(Date:yyyyMMdd)$(Rev:.r)
+
+trigger:
+  branches:
+    include:
+    - develop
+    - release/*
+    - main
+    - hotfix/*
+  paths:
+    include:
+    - web/**
+    - function/**
+    - pipelines/**
+pr: none
+
+parameters:
+- name: targetEnvironment
+  displayName: Hotfix only — env before PROD
+  type: string
+  default: dev
+  values: [dev, sit, uat, preprod]
+
+stages:
+- stage: Build
+  displayName: Build
+  variables:
+  - template: variables/common.yml
+  jobs:
+  - template: templates/build-node.yml
+
+# --- develop → DEV
+- template: templates/deploy-app.yml
+  parameters:
+    stageName: DeployDev
+    environment: dev
+    dependsOn: [Build]
+    condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/develop'))
+
+# --- release/* → SIT → UAT
+- template: templates/deploy-app.yml
+  parameters:
+    stageName: DeploySit
+    environment: sit
+    dependsOn: [Build]
+    condition: and(succeeded(), startsWith(variables['Build.SourceBranch'], 'refs/heads/release/'))
+
+- template: templates/deploy-app.yml
+  parameters:
+    stageName: DeployUat
+    environment: uat
+    dependsOn: [Build, DeploySit]
+    condition: and(succeeded(), startsWith(variables['Build.SourceBranch'], 'refs/heads/release/'))
+
+# --- main → PREPROD → PROD
+- template: templates/deploy-app.yml
+  parameters:
+    stageName: DeployPreprod
+    environment: preprod
+    dependsOn: [Build]
+    condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
+
+- template: templates/deploy-app.yml
+  parameters:
+    stageName: DeployProd
+    environment: prod
+    dependsOn: [Build, DeployPreprod]
+    condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
+
+# --- hotfix/* → target → PROD
+- template: templates/deploy-app.yml
+  parameters:
+    stageName: DeployHotfixTarget
+    environment: ${{ parameters.targetEnvironment }}
+    dependsOn: [Build]
+    condition: and(succeeded(), startsWith(variables['Build.SourceBranch'], 'refs/heads/hotfix/'))
+
+- template: templates/deploy-app.yml
+  parameters:
+    stageName: DeployHotfixProd
+    environment: prod
+    dependsOn: [Build, DeployHotfixTarget]
+    condition: and(succeeded(), startsWith(variables['Build.SourceBranch'], 'refs/heads/hotfix/'))

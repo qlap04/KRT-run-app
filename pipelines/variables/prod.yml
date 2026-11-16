@@ -1,0 +1,10 @@
+# Environment: prod  (prod: dedicated resources)
+# Resource names must match the Bicep in the infra repo: <prefix>-<resourceEnv>-web / -func / -apim.
+variables:
+  environment: prod
+  serviceConnection: sc-krtrun-prod   # Azure Resource Manager service connection (workload identity federation)
+  resourceGroup: rg-krtrun-prod
+  webAppName: krtrun-prod-web
+  functionAppName: krtrun-prod-func
+  apimName: krtrun-prod-apim
+  deployApim: 'true'

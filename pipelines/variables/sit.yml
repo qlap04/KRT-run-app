@@ -1,0 +1,10 @@
+# Environment: sit  (sit: shares the dev resources (same RG/app/storage as dev), only APP_ENV=sit differs)
+# Resource names must match the Bicep in the infra repo: <prefix>-<resourceEnv>-web / -func / -apim.
+variables:
+  environment: sit
+  serviceConnection: sc-krtrun-dev   # Azure Resource Manager service connection (workload identity federation)
+  resourceGroup: rg-krtrun-dev
+  webAppName: krtrun-dev-web
+  functionAppName: krtrun-dev-func
+  apimName: krtrun-dev-apim
+  deployApim: 'true'

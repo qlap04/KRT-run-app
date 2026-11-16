@@ -1,0 +1,2 @@
+<% const labels = { PENDING_PROCESSING: 'Processing', PENDING_REVIEW: 'Pending review', REJECTED_INVALID: 'Invalid image', APPROVED: 'Approved', REJECTED: 'Rejected' }; %>
+<span class="badge <%= status %>"><%= labels[status] || status %></span>

@@ -1,0 +1,15 @@
+<%- include('partials/_header') %>
+<div class="card narrow">
+  <h2>Register</h2>
+  <% if (error) { %><p class="err"><%= error %></p><% } %>
+  <form method="post" action="/register">
+    <input type="hidden" name="_csrf" value="<%= csrf %>">
+    <label>Employee code <input name="employeeCode" value="<%= form.employeeCode || '' %>" required></label>
+    <label>Full name <input name="fullName" value="<%= form.fullName || '' %>" required></label>
+    <label>Password (at least 8 characters) <input type="password" name="password" required minlength="8"></label>
+    <label>Repeat password <input type="password" name="password2" required minlength="8"></label>
+    <button>Register</button>
+  </form>
+  <p>Already have an account? <a href="/login">Log in</a></p>
+</div>
+<%- include('partials/_footer') %>

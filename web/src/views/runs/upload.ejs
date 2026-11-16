@@ -1,0 +1,14 @@
+<%- include('partials/_header') %>
+<div class="card narrow">
+  <h2>Submit running proof</h2>
+  <% if (ok) { %><p class="okmsg">Received! Your image is being processed. Check the result under “My runs”.</p><% } %>
+  <% if (error) { %><p class="err"><%= error %></p><% } %>
+  <form method="post" action="/upload" enctype="multipart/form-data">
+    <input type="hidden" name="_csrf" value="<%= csrf %>">
+    <label>Run date <input type="date" name="runDate" value="<%= form.runDate || '' %>" max="<%= today %>" required></label>
+    <label>Distance (km) <input name="km" inputmode="decimal" value="<%= form.km || '' %>" placeholder="5.2" required></label>
+    <label>Proof image (JPG/PNG, max 5MB) <input type="file" name="proof" accept="image/jpeg,image/png" required></label>
+    <button>Submit</button>
+  </form>
+</div>
+<%- include('partials/_footer') %>

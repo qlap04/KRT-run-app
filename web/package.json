@@ -1,0 +1,32 @@
+{
+  "name": "krtrun-web",
+  "version": "1.0.0",
+  "description": "KRT-run - monthly running proof portal (Express monolith)",
+  "main": "server.js",
+  "private": true,
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "start": "node server.js",
+    "test": "npm run test:unit",
+    "test:unit": "node --test \"tests/unit/**/*.test.js\"",
+    "test:integration": "node --test --test-concurrency=1 \"tests/integration/**/*.test.js\"",
+    "test:unit:ci": "mkdir -p test-results && node --test --test-reporter=spec --test-reporter-destination=stdout --test-reporter=junit --test-reporter-destination=test-results/unit.xml \"tests/unit/**/*.test.js\"",
+    "test:integration:ci": "mkdir -p test-results && node --test --test-concurrency=1 --test-reporter=spec --test-reporter-destination=stdout --test-reporter=junit --test-reporter-destination=test-results/integration.xml \"tests/integration/**/*.test.js\""
+  },
+  "dependencies": {
+    "@azure/data-tables": "^13.3.2",
+    "@azure/identity": "^4.14.1",
+    "@azure/storage-blob": "^12.34.0",
+    "@azure/storage-queue": "^12.32.0",
+    "bcryptjs": "^3.0.3",
+    "ejs": "^7.0.2",
+    "express": "^5.3.0",
+    "express-session": "^1.19.0",
+    "multer": "^2.5.0"
+  },
+  "devDependencies": {
+    "supertest": "^7.3.2"
+  }
+}

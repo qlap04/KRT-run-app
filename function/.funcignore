@@ -1,0 +1,4 @@
+tests
+local.settings*.json
+.git*
+*.zip

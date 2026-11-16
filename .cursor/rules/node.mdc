@@ -1,0 +1,13 @@
+---
+description: Rules for editing Node.js code (app repo)
+globs: web/**,function/**
+alwaysApply: false
+---
+- Node 22 LTS, CommonJS, `async/await`, small functions. Validation logic is pure functions in `validation.js` so it is easy to test.
+- Create storage clients in one place (`storage.js`): DefaultAzureCredential (or STORAGE_CONNECTION_STRING when set).
+- AuditLog is insert-only (`createEntity`); never update or delete.
+- Hash passwords with bcryptjs; never log passwords, secrets or connection strings.
+- Every new piece of logic gets a `node:test` test: unit tests in `tests/unit/` (pure, no network), integration tests in `web/tests/integration/` (CI only, real storage emulator).
+- Always escape in EJS (`<%= %>`); never use `<%- %>` for user data.
+- No hardcoded secrets; read them from `process.env`.
+- All user-facing text, messages, logs, comments and test names are in English.

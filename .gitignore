@@ -1,0 +1,14 @@
+node_modules/
+.env
+.env.*
+!.env.example
+local.settings.json
+__azurite_db*
+__blobstorage__/
+__queuestorage__/
+__tablestorage__/
+.azurite/
+coverage/
+*.zip
+.DS_Store
+test-results/
