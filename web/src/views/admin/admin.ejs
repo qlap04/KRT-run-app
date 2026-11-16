@@ -1,4 +1,4 @@
-<%- include('partials/_header') %>
+<%- include('../partials/_header') %>
 <h2>Review proofs – <%= month %></h2>
 <form method="get" class="inline"><label>Month <input type="month" name="month" value="<%= month %>"></label> <button>View</button></form>
 <table>
@@ -17,4 +17,4 @@
   <% }) %>
   <% if (!list.length) { %><tr><td colspan="5">Nothing is waiting for review.</td></tr><% } %>
 </table>
-<%- include('partials/_footer') %>
+<%- include('../partials/_footer') %>

@@ -1,4 +1,4 @@
-<%- include('partials/_header') %>
+<%- include('../partials/_header') %>
 <h2>Audit log – <%= date %></h2>
 <form method="get" class="inline"><label>Date <input type="date" name="date" value="<%= date %>"></label> <button>View</button></form>
 <table>
@@ -10,4 +10,4 @@
   <% }) %>
   <% if (!rows.length) { %><tr><td colspan="9">No records.</td></tr><% } %>
 </table>
-<%- include('partials/_footer') %>
+<%- include('../partials/_footer') %>

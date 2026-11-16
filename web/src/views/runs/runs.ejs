@@ -1,4 +1,4 @@
-<%- include('partials/_header') %>
+<%- include('../partials/_header') %>
 <h2>My runs – <%= month %></h2>
 <form method="get" class="inline"><label>Month <input type="month" name="month" value="<%= month %>"></label> <button>View</button></form>
 <div class="stats">
@@ -10,11 +10,11 @@
   <% list.forEach(function(r){ %>
   <tr>
     <td><%= r.runDate %></td><td><%= r.km %></td>
-    <td><%- include('partials/_status', { status: r.status }) %></td>
+    <td><%- include('../partials/_status', { status: r.status }) %></td>
     <td><%= r.reviewNote || r.rejectReason || '' %></td>
     <td><% if (r.blobPath) { %><a href="/proof/<%= r.partitionKey %>/<%= r.rowKey %>" target="_blank">View</a><% } %></td>
   </tr>
   <% }) %>
   <% if (!list.length) { %><tr><td colspan="5">No submissions yet. <a href="/upload">Submit one now</a></td></tr><% } %>
 </table>
-<%- include('partials/_footer') %>
+<%- include('../partials/_footer') %>

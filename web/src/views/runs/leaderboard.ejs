@@ -1,4 +1,4 @@
-<%- include('partials/_header') %>
+<%- include('../partials/_header') %>
 <h2>Leaderboard – <%= month %></h2>
 <form method="get" class="inline"><label>Month <input type="month" name="month" value="<%= month %>"></label> <button>View</button></form>
 <table>
@@ -8,4 +8,4 @@
   <% }) %>
   <% if (!rows.length) { %><tr><td colspan="4">No data yet.</td></tr><% } %>
 </table>
-<%- include('partials/_footer') %>
+<%- include('../partials/_footer') %>
