@@ -104,7 +104,7 @@ Approval **không** nằm trong YAML: bạn vào Azure DevOps → Pipelines → 
    git checkout -b develop && git push -u origin develop
    ```
    (Repo này đã `git init -b develop`, chưa có commit. Nhớ tạo nhánh `main` trước khi dùng luồng release.)
-2. **Service connection** (Project settings → Service connections → *Azure Resource Manager* → **Workload identity federation**): `sc-krtrun-dev` và `sc-krtrun-prod` (khớp `serviceConnection` trong `pipelines/variables/<env>.yml`). Có thể dùng chung với repo `infra` nếu cùng project; cần quyền deploy web app / function app / APIM (Contributor trên resource group là đủ).
+2. **Service connection** (Project settings → Service connections → *Azure Resource Manager* → **Workload identity federation**): `sc-krtrun-dev`, dùng chung cho mọi môi trường (khớp `serviceConnection` trong `pipelines/variables/<env>.yml`). Có thể dùng chung với repo `infra` nếu cùng project; cần quyền deploy web app / function app / APIM (Contributor trên resource group là đủ).
 3. **Environments**: `krtrun-dev`, `krtrun-sit`, `krtrun-uat`, `krtrun-preprod`, `krtrun-prod`; thêm **Approvals** cho `uat`, `preprod`, `prod` (Approvals and checks).
 4. **Tạo pipeline** (Pipelines → New → Azure Repos Git → *Existing Azure Pipelines YAML file*): `krtrun-app-deploy` → `/pipelines/app-deploy.yml`.
 5. **Điều kiện trước khi chạy**: repo `infra` đã chạy provision cho môi trường tương ứng (nếu chưa có web app thì deploy sẽ lỗi).
