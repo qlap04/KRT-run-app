@@ -36,7 +36,7 @@ stages:
           - task: AzureWebApp@1
             displayName: Web -> $(webAppName)
             inputs:
-              azureSubscription: $(serviceConnection)
+              azureSubscription: ${{ variables.serviceConnection }}
               appType: webAppLinux
               appName: $(webAppName)
               package: $(Pipeline.Workspace)/$(artifactName)/web.zip
@@ -46,7 +46,7 @@ stages:
           - task: AzureFunctionApp@2
             displayName: Function -> $(functionAppName)
             inputs:
-              connectedServiceNameARM: $(serviceConnection)
+              connectedServiceNameARM: ${{ variables.serviceConnection }}
               appType: functionAppLinux
               appName: $(functionAppName)
               package: $(Pipeline.Workspace)/$(artifactName)/function.zip
@@ -57,7 +57,7 @@ stages:
             displayName: APIM import $(apimName)
             condition: and(succeeded(), eq(variables['deployApim'], 'true'))
             inputs:
-              azureSubscription: $(serviceConnection)
+              azureSubscription: ${{ variables.serviceConnection }}
               scriptType: bash
               scriptLocation: inlineScript
               inlineScript: |
