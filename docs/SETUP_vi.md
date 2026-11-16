@@ -83,7 +83,7 @@ Nhánh tính năng (`feature/<tên>`) cắt từ `develop` và merge lại bằn
 
 Code đã nằm trên GitHub, nhánh `develop`: [https://github.com/qlap04/KRT-run-app](https://github.com/qlap04/KRT-run-app). Không cần tạo repo Azure Repos hay push lại.
 
-1. **Service connection** (Project settings → Service connections → *Azure Resource Manager* → **Workload identity federation**): tạo `sc-krtrun-dev`. Tên phải khớp `serviceConnection` trong `pipelines/variables/dev.yml`. Có thể dùng chung với repo `infra` nếu cùng project; cần quyền deploy web app / function app / APIM (Contributor trên resource group là đủ).
+1. **Service connection** (Project settings → Service connections → *Azure Resource Manager* → **Workload identity federation**): tạo `sc-krtrun-dev`. Tên phải khớp `serviceConnection` truyền vào template trong `pipelines/app-deploy.yml`. Có thể dùng chung với repo `infra` nếu cùng project; cần quyền deploy web app / function app / APIM (Contributor trên resource group là đủ).
 2. **Environments**: chỉ cần `krtrun-dev`; vào Approvals and checks rồi **bật Approvals**.
 3. **Tạo pipeline** (Pipelines → New pipeline → chọn **GitHub (YAML)** → chọn repo `qlap04/KRT-run-app` → *Existing Azure Pipelines YAML file*): `krtrun-app-deploy` → `/pipelines/app-deploy.yml`. Lần đầu Azure DevOps sẽ xin quyền truy cập GitHub.
 4. **Điều kiện trước khi chạy**: repo `infra` đã chạy provision cho **dev** (nếu chưa có web app thì deploy sẽ lỗi).

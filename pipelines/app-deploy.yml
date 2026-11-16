@@ -27,5 +27,6 @@ stages:
   parameters:
     stageName: DeployDev
     environment: dev
+    serviceConnection: sc-krtrun-dev
     dependsOn: [Build]
     condition: succeeded()

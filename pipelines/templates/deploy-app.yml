@@ -4,6 +4,8 @@ parameters:
   type: string
 - name: environment
   type: string
+- name: serviceConnection
+  type: string
 - name: dependsOn
   type: object
   default: []
@@ -36,7 +38,7 @@ stages:
           - task: AzureWebApp@1
             displayName: Web -> $(webAppName)
             inputs:
-              azureSubscription: ${{ variables.serviceConnection }}
+              azureSubscription: ${{ parameters.serviceConnection }}
               appType: webAppLinux
               appName: $(webAppName)
               package: $(Pipeline.Workspace)/$(artifactName)/web.zip
@@ -46,7 +48,7 @@ stages:
           - task: AzureFunctionApp@2
             displayName: Function -> $(functionAppName)
             inputs:
-              connectedServiceNameARM: ${{ variables.serviceConnection }}
+              connectedServiceNameARM: ${{ parameters.serviceConnection }}
               appType: functionAppLinux
               appName: $(functionAppName)
               package: $(Pipeline.Workspace)/$(artifactName)/function.zip
@@ -57,7 +59,7 @@ stages:
             displayName: APIM import $(apimName)
             condition: and(succeeded(), eq(variables['deployApim'], 'true'))
             inputs:
-              azureSubscription: ${{ variables.serviceConnection }}
+              azureSubscription: ${{ parameters.serviceConnection }}
               scriptType: bash
               scriptLocation: inlineScript
               inlineScript: |
