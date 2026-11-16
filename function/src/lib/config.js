@@ -7,8 +7,7 @@ function loadConfig(env = process.env) {
     appEnv: env.APP_ENV || 'dev',
     connectionString: cs,
     accountName: acct,
-    incoming: env.BLOB_CONTAINER_INCOMING || 'incoming',
-    proofs: env.BLOB_CONTAINER_PROOFS || 'proofs',
+    blobContainer: env.BLOB_CONTAINER || 'proofs',
     runsTable: env.TABLE_RUNS || 'Runs',
     auditTable: env.TABLE_AUDIT || 'AuditLog',
   };

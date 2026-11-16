@@ -12,7 +12,7 @@ app/
 └── docs/SETUP_vi.md
 ```
 
-Luồng nghiệp vụ: Nhân viên upload ảnh + km + ngày chạy → web lưu ảnh vào blob `incoming`, ghi `Runs` (PENDING_PROCESSING), đẩy message vào queue `upload-jobs`, ghi `AuditLog` (UPLOAD) rồi trả về ngay → Function kiểm tra ảnh, chuyển sang blob `proofs`, cập nhật `Runs` (PENDING_REVIEW hoặc REJECTED_INVALID), ghi `AuditLog` (PROCESSED) → Admin duyệt (APPROVED/REJECTED) → bảng xếp hạng chỉ tính km đã duyệt.
+Luồng nghiệp vụ: Nhân viên upload ảnh + km + ngày chạy → web lưu ảnh vào container `proofs`, thư mục `incoming/`, ghi `Runs` (PENDING_PROCESSING), đẩy message vào queue `upload-jobs`, ghi `AuditLog` (UPLOAD) rồi trả về ngay → Function kiểm tra ảnh, chuyển sang thư mục `processed/` (cùng container), cập nhật `Runs` (PENDING_REVIEW hoặc REJECTED_INVALID), ghi `AuditLog` (PROCESSED) → Admin duyệt (APPROVED/REJECTED) → bảng xếp hạng chỉ tính km đã duyệt.
 
 ---
 
@@ -26,7 +26,7 @@ Luồng nghiệp vụ: Nhân viên upload ảnh + km + ngày chạy → web lưu
 | `APP_ENV` | Tên môi trường (hiện dùng `dev`; app vẫn nhận sit/uat/preprod/prod để sau này mở rộng) | `dev` |
 | `STORAGE_ACCOUNT_NAME` | Tên storage trên Azure (dùng managed identity) | `stkrtrundevab12cd` |
 | `QUEUE_NAME` | Tên queue | `upload-jobs` |
-| `BLOB_CONTAINER_INCOMING` / `BLOB_CONTAINER_PROOFS` | Tên container | `incoming` / `proofs` |
+| `BLOB_CONTAINER` | Tên container duy nhất chứa ảnh. Ảnh mới nằm ở `incoming/`, ảnh đã xử lý nằm ở `processed/` | `proofs` |
 | `TABLE_USERS` / `TABLE_RUNS` / `TABLE_AUDIT` | Tên table | `Users` / `Runs` / `AuditLog` |
 | `SESSION_SECRET` | Khoá ký session (**secret**, bắt buộc khi `APP_ENV=prod`) | chuỗi ngẫu nhiên dài |
 | `ADMIN_CODE` | Mã nhân viên đăng ký đầu tiên sẽ thành admin (**secret**) | `ADMIN01` |

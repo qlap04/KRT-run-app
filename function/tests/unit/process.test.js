@@ -20,8 +20,11 @@ function setup({ blob = JPG, runStatus = 'PENDING_PROCESSING', getRun } = {}) {
     return { readableStreamBody: Readable.from([blob]) };
   });
   const storage = {
-    incoming: { getBlobClient: mock.fn(() => ({ download, deleteIfExists: deleteSource })) },
-    proofs: { containerName: 'proofs', getBlockBlobClient: mock.fn(() => ({ uploadData: upload })) },
+    blobs: {
+      containerName: 'proofs',
+      getBlobClient: mock.fn(() => ({ download, deleteIfExists: deleteSource })),
+      getBlockBlobClient: mock.fn(() => ({ uploadData: upload })),
+    },
     runs: {
       getEntity: mock.fn(getRun || (async () => ({ status: runStatus, km: 5, runDate: '2026-11-10' }))),
       updateEntity: mock.fn(async () => {}),
@@ -34,12 +37,13 @@ const audited = (storage) => storage.audit.createEntity.mock.calls.map((c) => c.
 const updated = (storage) => storage.runs.updateEntity.mock.calls.map((c) => c.arguments);
 
 describe('processMessage: valid image', () => {
-  it('moves the blob to proofs and marks the run PENDING_REVIEW', async () => {
+  it('moves the blob from incoming/ to processed/ and marks the run PENDING_REVIEW', async () => {
     const { storage, upload, deleteSource } = setup();
     const result = await processMessage(msg, { storage });
 
     assert.deepEqual(result, { status: 'PENDING_REVIEW' });
-    assert.equal(storage.proofs.getBlockBlobClient.mock.calls[0].arguments[0], `2026-11/F001/${RUN_ID}.jpg`);
+    assert.equal(storage.blobs.getBlobClient.mock.calls[0].arguments[0], `incoming/${RUN_ID}.jpg`);
+    assert.equal(storage.blobs.getBlockBlobClient.mock.calls[0].arguments[0], `processed/2026-11/F001/${RUN_ID}.jpg`);
     assert.equal(upload.mock.calls[0].arguments[0].length, JPG.length);
     assert.equal(upload.mock.calls[0].arguments[1].blobHTTPHeaders.blobContentType, 'image/jpeg');
     assert.equal(deleteSource.mock.callCount(), 1);
@@ -50,7 +54,7 @@ describe('processMessage: valid image', () => {
     assert.equal(entity.rowKey, RUN_ID);
     assert.equal(entity.status, 'PENDING_REVIEW');
     assert.equal(entity.blobContainer, 'proofs');
-    assert.equal(entity.blobPath, `2026-11/F001/${RUN_ID}.jpg`);
+    assert.equal(entity.blobPath, `processed/2026-11/F001/${RUN_ID}.jpg`);
   });
   it('writes one PROCESSED audit record with result OK', async () => {
     const { storage } = setup();
@@ -65,7 +69,7 @@ describe('processMessage: valid image', () => {
   it('uses the detected type for the extension (png content gives .png)', async () => {
     const { storage } = setup({ blob: PNG });
     await processMessage({ ...msg, blobName: `${RUN_ID}.png` }, { storage });
-    assert.equal(storage.proofs.getBlockBlobClient.mock.calls[0].arguments[0], `2026-11/F001/${RUN_ID}.png`);
+    assert.equal(storage.blobs.getBlockBlobClient.mock.calls[0].arguments[0], `processed/2026-11/F001/${RUN_ID}.png`);
   });
 });
 

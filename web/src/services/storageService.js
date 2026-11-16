@@ -23,8 +23,7 @@ function createStorage(cfg) {
   }
 
   const storage = {
-    incoming: blobService.getContainerClient(n.incomingContainer),
-    proofs: blobService.getContainerClient(n.proofsContainer),
+    blobs: blobService.getContainerClient(n.blobContainer),
     queue: queueService.getQueueClient(n.queue),
     users: table(n.usersTable),
     runs: table(n.runsTable),
@@ -36,8 +35,7 @@ function createStorage(cfg) {
 
   storage.ensure = async () => {
     await Promise.all([
-      storage.incoming.createIfNotExists(),
-      storage.proofs.createIfNotExists(),
+      storage.blobs.createIfNotExists(),
       storage.queue.createIfNotExists(),
       storage.users.createTable(),
       storage.runs.createTable(),

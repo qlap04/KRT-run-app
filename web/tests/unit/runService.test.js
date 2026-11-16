@@ -8,13 +8,13 @@ const JPG = Buffer.concat([Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10]), Bu
 const RUN_ID = '11111111-1111-1111-1111-111111111111';
 const user = { code: 'F001', fullName: 'Ann', role: 'user' };
 const admin = { code: 'ADM01', fullName: 'Root', role: 'admin' };
-const cfg = { names: { incomingContainer: 'incoming' } };
+const cfg = { names: { blobContainer: 'proofs' } };
 
 function setup({ runRows = [], run = null } = {}) {
   const blockBlob = { uploadData: mock.fn(async () => {}) };
   const download = mock.fn(async () => ({ readableStreamBody: Readable.from([JPG]) }));
   const storage = {
-    incoming: { getBlockBlobClient: mock.fn(() => blockBlob) },
+    blobs: { getBlockBlobClient: mock.fn(() => blockBlob) },
     queue: { sendMessage: mock.fn(async () => {}) },
     container: mock.fn(() => ({ getBlobClient: () => ({ download }) })),
   };
@@ -62,8 +62,9 @@ describe('runService.upload', () => {
     const { service, blockBlob, storage, runs, audit } = setup();
     assert.deepEqual(await service.upload(input), { ok: true });
 
-    const blobName = storage.incoming.getBlockBlobClient.mock.calls[0].arguments[0];
-    assert.match(blobName, /^[0-9a-f-]{36}\.jpg$/);
+    const blobPath = storage.blobs.getBlockBlobClient.mock.calls[0].arguments[0];
+    assert.match(blobPath, /^incoming\/[0-9a-f-]{36}\.jpg$/);
+    const blobName = blobPath.slice('incoming/'.length);
     assert.equal(blockBlob.uploadData.mock.calls[0].arguments[0], JPG);
 
     const run = runs.create.mock.calls[0].arguments[0];
@@ -71,7 +72,8 @@ describe('runService.upload', () => {
     assert.equal(run.status, STATUS.PENDING_PROCESSING);
     assert.equal(run.km, 5.2);
     assert.equal(run.employeeCode, 'F001');
-    assert.equal(run.blobContainer, 'incoming');
+    assert.equal(run.blobContainer, 'proofs');
+    assert.equal(run.blobPath, blobPath);
 
     const sent = storage.queue.sendMessage.mock.calls[0].arguments[0];
     const msg = JSON.parse(Buffer.from(sent, 'base64').toString('utf8'));
@@ -140,7 +142,7 @@ describe('runService.review', () => {
 });
 
 describe('runService.openProof', () => {
-  const run = { employeeCode: 'F001', blobPath: '2026-11/F001/x.jpg', blobContainer: 'proofs', contentType: 'image/jpeg' };
+  const run = { employeeCode: 'F001', blobPath: 'processed/2026-11/F001/x.jpg', blobContainer: 'proofs', contentType: 'image/jpeg' };
 
   it('lets the owner open the proof', async () => {
     const { service, storage } = setup({ run });

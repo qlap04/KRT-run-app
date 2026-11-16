@@ -13,7 +13,7 @@ describe('config: defaults', () => {
     assert.equal(c.isProd, false);
     assert.equal(c.port, 8080);
     assert.deepEqual(c.names, {
-      incomingContainer: 'incoming', proofsContainer: 'proofs', queue: 'upload-jobs',
+      blobContainer: 'proofs', queue: 'upload-jobs',
       usersTable: 'Users', runsTable: 'Runs', auditTable: 'AuditLog',
     });
     assert.equal(c.sessionSecretGenerated, true);
@@ -62,14 +62,14 @@ describe('config: storage and overrides', () => {
   it('reads resource names, secrets and port from the environment', () => {
     const c = loadConfig({
       ...base, PORT: '3000', ADMIN_CODE: 'ADM01', API_KEY: 'key', SESSION_SECRET: 'x',
-      BLOB_CONTAINER_INCOMING: 'in', BLOB_CONTAINER_PROOFS: 'pr', QUEUE_NAME: 'q',
+      BLOB_CONTAINER: 'pr', QUEUE_NAME: 'q',
       TABLE_USERS: 'U', TABLE_RUNS: 'R', TABLE_AUDIT: 'A',
     });
     assert.equal(c.port, 3000);
     assert.equal(c.adminCode, 'ADM01');
     assert.equal(c.apiKey, 'key');
     assert.deepEqual(c.names, {
-      incomingContainer: 'in', proofsContainer: 'pr', queue: 'q', usersTable: 'U', runsTable: 'R', auditTable: 'A',
+      blobContainer: 'pr', queue: 'q', usersTable: 'U', runsTable: 'R', auditTable: 'A',
     });
   });
   it('falls back to SERVER_PORT when PORT is not set', () => {

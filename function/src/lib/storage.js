@@ -14,8 +14,7 @@ function createStorage(cfg) {
     table = (n) => new TableClient(`https://${cfg.accountName}.table.core.windows.net`, n, cred);
   }
   return {
-    incoming: blobService.getContainerClient(cfg.incoming),
-    proofs: blobService.getContainerClient(cfg.proofs),
+    blobs: blobService.getContainerClient(cfg.blobContainer),
     runs: table(cfg.runsTable),
     audit: table(cfg.auditTable),
   };

@@ -7,8 +7,7 @@
     "STORAGE_CONNECTION_STRING": "UseDevelopmentStorage=true",
     "STORAGE_ACCOUNT_NAME": "",
     "QUEUE_NAME": "upload-jobs",
-    "BLOB_CONTAINER_INCOMING": "incoming",
-    "BLOB_CONTAINER_PROOFS": "proofs",
+    "BLOB_CONTAINER": "proofs",
     "TABLE_RUNS": "Runs",
     "TABLE_AUDIT": "AuditLog"
   }

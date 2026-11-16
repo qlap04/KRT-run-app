@@ -1,7 +1,7 @@
 # KRT-run – `app` repo (application code)
 
 Stack: Node.js 22 LTS, Express (EJS) monolith, Azure Functions Node.js v4. Infrastructure lives in the separate `infra` repo (Bicep + provision pipeline).
-Storage: Blob (incoming, proofs), Queue (upload-jobs), Table (Users, Runs, AuditLog).
+Storage: Blob (one container `proofs`, folders `incoming/` and `processed/`), Queue (upload-jobs), Table (Users, Runs, AuditLog).
 
 ## Layout
 - `web/` – Express monolith (src/ MVC: config/models/services/controllers/routes/middlewares/views, public/, openapi.yaml, tests/)

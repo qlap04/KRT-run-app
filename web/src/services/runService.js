@@ -60,15 +60,17 @@ function createRunService({ cfg, storage, runs, audit }) {
       const month = form.runDate.slice(0, 7);
       const runId = crypto.randomUUID();
       const blobName = `${runId}.${img.ext}`;
+      // One container: new uploads go under incoming/, the function moves them under processed/
+      const blobPath = `incoming/${blobName}`;
 
-      await storage.incoming.getBlockBlobClient(blobName).uploadData(file.buffer, {
+      await storage.blobs.getBlockBlobClient(blobPath).uploadData(file.buffer, {
         blobHTTPHeaders: { blobContentType: img.contentType },
       });
       await runs.create({
         partitionKey: month, rowKey: runId, employeeCode: user.code, fullName: user.fullName,
         km: parsedKm, runDate: form.runDate, status: STATUS.PENDING_PROCESSING,
         originalName: String(file.originalname || '').slice(0, 100), contentType: img.contentType,
-        blobContainer: cfg.names.incomingContainer, blobPath: blobName, createdUtc: new Date().toISOString(),
+        blobContainer: cfg.names.blobContainer, blobPath, createdUtc: new Date().toISOString(),
       });
       const msg = { runId, month, employeeCode: user.code, blobName, km: parsedKm, runDate: form.runDate };
       // Base64 so the Azure Functions queue trigger can decode it

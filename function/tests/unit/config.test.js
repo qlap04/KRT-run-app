@@ -6,7 +6,7 @@ const { loadConfig } = require('../../src/lib/config');
 describe('function config', () => {
   it('uses defaults when only the account name is given', () => {
     assert.deepEqual(loadConfig({ STORAGE_ACCOUNT_NAME: 'acct' }), {
-      appEnv: 'dev', connectionString: '', accountName: 'acct', incoming: 'incoming', proofs: 'proofs',
+      appEnv: 'dev', connectionString: '', accountName: 'acct', blobContainer: 'proofs',
       runsTable: 'Runs', auditTable: 'AuditLog',
     });
   });
@@ -15,10 +15,10 @@ describe('function config', () => {
   });
   it('reads the overrides', () => {
     const c = loadConfig({
-      STORAGE_ACCOUNT_NAME: 'a', APP_ENV: 'uat', BLOB_CONTAINER_INCOMING: 'in', BLOB_CONTAINER_PROOFS: 'pr',
+      STORAGE_ACCOUNT_NAME: 'a', APP_ENV: 'uat', BLOB_CONTAINER: 'pr',
       TABLE_RUNS: 'R', TABLE_AUDIT: 'A',
     });
-    assert.deepEqual([c.appEnv, c.incoming, c.proofs, c.runsTable, c.auditTable], ['uat', 'in', 'pr', 'R', 'A']);
+    assert.deepEqual([c.appEnv, c.blobContainer, c.runsTable, c.auditTable], ['uat', 'pr', 'R', 'A']);
   });
   it('fails clearly when no storage setting exists', () => {
     assert.throws(() => loadConfig({}), /STORAGE_ACCOUNT_NAME or STORAGE_CONNECTION_STRING/);

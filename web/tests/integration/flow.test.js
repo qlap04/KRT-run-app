@@ -64,9 +64,9 @@ describe('web + storage integration', { skip: SKIP }, () => {
     return agent.post('/upload').field('_csrf', t).field('runDate', runDate).field('km', km)
       .attach('proof', file, { filename, contentType: 'image/jpeg' });
   };
-  const listBlobs = async (container) => {
+  const listBlobs = async (container, prefix = '') => {
     const names = [];
-    for await (const b of container.listBlobsFlat()) names.push(b.name);
+    for await (const b of container.listBlobsFlat({ prefix })) names.push(b.name);
     return names;
   };
   const listAll = async (table) => {
@@ -101,8 +101,7 @@ describe('web + storage integration', { skip: SKIP }, () => {
       SESSION_SECRET: crypto.randomBytes(32).toString('hex'),
       ADMIN_CODE: adminCode,
       API_KEY: apiKey,
-      BLOB_CONTAINER_INCOMING: `it-in-${suffix}`,
-      BLOB_CONTAINER_PROOFS: `it-proofs-${suffix}`,
+      BLOB_CONTAINER: `it-proofs-${suffix}`,
       QUEUE_NAME: `it-queue-${suffix}`,
       TABLE_USERS: `ItUsers${suffix}`,
       TABLE_RUNS: `ItRuns${suffix}`,
@@ -125,7 +124,7 @@ describe('web + storage integration', { skip: SKIP }, () => {
   after(async () => {
     if (!storage) return;
     await Promise.allSettled([
-      storage.incoming.deleteIfExists(), storage.proofs.deleteIfExists(), storage.queue.deleteIfExists(),
+      storage.blobs.deleteIfExists(), storage.queue.deleteIfExists(),
       storage.users.deleteTable(), storage.runs.deleteTable(), storage.audit.deleteTable(),
     ]);
   });
@@ -203,9 +202,9 @@ describe('web + storage integration', { skip: SKIP }, () => {
   describe('upload validation', () => {
     it('rejects a non-image file and stores nothing for that user', async () => {
       const { agent, code } = await newUser();
-      const before = (await listBlobs(storage.incoming)).length;
+      const before = (await listBlobs(storage.blobs)).length;
       await upload(agent, { file: Buffer.from('this is not an image') }).then((r) => assert.equal(r.status, 400));
-      assert.equal((await listBlobs(storage.incoming)).length, before);
+      assert.equal((await listBlobs(storage.blobs)).length, before);
       assert.deepEqual(await queueMessagesFor(code), []);
       assert.deepEqual((await listAll(storage.runs)).filter((r) => r.employeeCode === code), []);
     });
@@ -226,7 +225,7 @@ describe('web + storage integration', { skip: SKIP }, () => {
       const admin = request.agent(app);
       await login(admin, adminCode, adminPassword).then((r) => assert.equal(r.status, 302));
 
-      // 1) upload: blob in incoming, queue message, run PENDING_PROCESSING
+      // 1) upload: blob under incoming/, queue message, run PENDING_PROCESSING
       const day = todayVN();
       const month = day.slice(0, 7);
       await upload(agent, { km: '5,2', runDate: day }).then((r) => {
@@ -236,21 +235,21 @@ describe('web + storage integration', { skip: SKIP }, () => {
       const [msg, ...others] = await queueMessagesFor(code);
       assert.equal(others.length, 0, 'exactly one queue message for this user');
       assert.equal(msg.km, 5.2);
-      assert.ok((await listBlobs(storage.incoming)).includes(msg.blobName), 'blob is in incoming');
+      assert.ok((await listBlobs(storage.blobs, 'incoming/')).includes(`incoming/${msg.blobName}`), 'blob is under incoming/');
       let run = await runs.get(month, msg.runId);
       assert.equal(run.status, 'PENDING_PROCESSING');
       assert.equal(Number(run.km), 5.2);
 
-      // 2) function: blob moves to proofs, run PENDING_REVIEW
+      // 2) function: blob moves to processed/, run PENDING_REVIEW
       assert.equal((await processMessage(msg, { storage })).status, 'PENDING_REVIEW');
-      assert.ok(!(await listBlobs(storage.incoming)).includes(msg.blobName), 'blob left incoming');
+      assert.deepEqual(await listBlobs(storage.blobs, 'incoming/'), [], 'nothing left under incoming/');
       assert.deepEqual(
-        (await listBlobs(storage.proofs)).filter((n) => n.includes(msg.runId)),
-        [`${month}/${code}/${msg.runId}.jpg`],
+        (await listBlobs(storage.blobs, 'processed/')).filter((n) => n.includes(msg.runId)),
+        [`processed/${month}/${code}/${msg.runId}.jpg`],
       );
       run = await runs.get(month, msg.runId);
       assert.equal(run.status, 'PENDING_REVIEW');
-      assert.equal(run.blobContainer, cfg.names.proofsContainer);
+      assert.equal(run.blobContainer, cfg.names.blobContainer);
 
       // 3) the owner can open the proof; another user gets 404
       const proof = await agent.get(`/proof/${month}/${msg.runId}`).buffer(true).parse((res, cb) => {

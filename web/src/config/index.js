@@ -36,8 +36,7 @@ function loadConfig(env = process.env) {
     port: Number(env.PORT || env.SERVER_PORT || 8080),
     storage: { accountName: storageAccountName, connectionString },
     names: {
-      incomingContainer: env.BLOB_CONTAINER_INCOMING || 'incoming',
-      proofsContainer: env.BLOB_CONTAINER_PROOFS || 'proofs',
+      blobContainer: env.BLOB_CONTAINER || 'proofs',
       queue: env.QUEUE_NAME || 'upload-jobs',
       usersTable: env.TABLE_USERS || 'Users',
       runsTable: env.TABLE_RUNS || 'Runs',

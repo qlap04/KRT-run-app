@@ -8,7 +8,8 @@ async function streamToBuffer(readable) {
   return Buffer.concat(chunks);
 }
 
-// deps: { storage: {incoming, proofs, runs, audit}, log }
+// One blob container: uploads sit under incoming/, validated images are moved under processed/.
+// deps: { storage: {blobs, runs, audit}, log }
 async function processMessage(msg, { storage, log = () => {} }) {
   const bad = validateMessage(msg);
   if (bad) {
@@ -27,7 +28,7 @@ async function processMessage(msg, { storage, log = () => {} }) {
   // Idempotent: the queue may deliver the same message twice
   if (run.status !== 'PENDING_PROCESSING') return { status: 'already-processed' };
 
-  const src = storage.incoming.getBlobClient(blobName);
+  const src = storage.blobs.getBlobClient(`incoming/${blobName}`);
   let buf;
   try {
     buf = await streamToBuffer((await src.download()).readableStreamBody);
@@ -41,10 +42,10 @@ async function processMessage(msg, { storage, log = () => {} }) {
     return finish('REJECTED_INVALID', img.error);
   }
 
-  const destPath = `${month}/${employeeCode}/${runId}.${img.ext}`;
-  await storage.proofs.getBlockBlobClient(destPath).uploadData(buf, { blobHTTPHeaders: { blobContentType: img.contentType } });
+  const destPath = `processed/${month}/${employeeCode}/${runId}.${img.ext}`;
+  await storage.blobs.getBlockBlobClient(destPath).uploadData(buf, { blobHTTPHeaders: { blobContentType: img.contentType } });
   await src.deleteIfExists();
-  return finish('PENDING_REVIEW', '', { blobContainer: storage.proofs.containerName, blobPath: destPath, contentType: img.contentType });
+  return finish('PENDING_REVIEW', '', { blobContainer: storage.blobs.containerName, blobPath: destPath, contentType: img.contentType });
 
   async function finish(status, reason, extra = {}) {
     await storage.runs.updateEntity({
