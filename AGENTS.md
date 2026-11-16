@@ -14,7 +14,7 @@ Storage: Blob (incoming, proofs), Queue (upload-jobs), Table (Users, Runs, Audit
 - No hardcoded secrets. Use env vars / variable group `krtrun-<env>`.
 - NEVER deploy to Azure, run `az login` or `az deployment` without Kai's explicit OK.
 - `AuditLog` is append-only (insert), never update/delete.
-- New logic needs tests (`node:test`). Unit tests: `npm run test:unit` in `web/` and `function/` (pure, no network; `npm test` = unit). Integration tests: `npm run test:integration` in `web/` (CI only; needs a storage emulator and `STORAGE_CONNECTION_STRING`, skipped when it is not set).
+- New logic needs tests (`node:test`). Unit tests: `npm run test:unit` in `web/` and `function/` (pure, no network; `npm test` = unit). Integration tests: `npm run test:integration` in `web/` (CI only; needs a storage emulator and `STORAGE_CONNECTION_STRING`, skipped when it is not set). Test conventions: unit tests inject config objects or restore `process.env`, use `node:test` `mock` fakes for storage; integration tests read config only from env vars, use random per-run resource names, clean up in `after()`, and generate test secrets at runtime.
 - Small, incremental changes. Everything in the system is English: UI text, messages, API responses, logs, comments, test names, pipeline names. Only `docs/SETUP_vi.md` is Vietnamese.
 - Resource names in `pipelines/variables/<env>.yml` must match the Bicep in the `infra` repo (`<prefix>-<resourceEnv>-web|func|apim`).
 

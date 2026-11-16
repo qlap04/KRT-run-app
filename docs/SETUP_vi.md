@@ -93,14 +93,44 @@ Secret (`SESSION_SECRET`, `ADMIN_CODE`, `API_KEY`) **không** nằm ở repo app
 
 ---
 
-## 5. Giới hạn hiện tại (nên biết)
+## 5. Chạy test
+
+Có 2 loại test, dùng `node:test` (không cần thêm thư viện):
+
+| Loại | Lệnh | Cần gì |
+|---|---|---|
+| **Unit test** (trong `web/` và `function/`) | `npm run test:unit` | Không cần gì. Không dùng mạng, không đọc biến môi trường thật. Storage được thay bằng đồ giả (mock). |
+| **Integration test** (chỉ trong `web/`) | `npm run test:integration` | Cần storage emulator (Azurite) và biến `STORAGE_CONNECTION_STRING`. |
+
+Quy tắc cho dễ nhớ:
+- **Không ghi cứng** connection string hay secret trong file test. Mọi cấu hình của integration test lấy từ biến môi trường. Mật khẩu, session secret và API key của test được tạo ngẫu nhiên lúc chạy.
+- Nếu chưa có `STORAGE_CONNECTION_STRING` thì integration test **tự bỏ qua** và in lý do. Đặt `INTEGRATION_REQUIRED=true` nếu muốn nó báo lỗi thay vì bỏ qua (pipeline đang đặt như vậy).
+- Mỗi lần chạy, test tạo container, queue, table có **tên ngẫu nhiên** và **xoá hết** khi xong, nên chạy nhiều lần không bị lẫn dữ liệu. Mỗi test tự tạo user riêng nên không phụ thuộc test khác.
+- Trên production **không chạy** unit hay integration test. Sau khi deploy chỉ chạy smoke test `/api/health`.
+
+Chạy integration test trên máy bạn (cần Docker):
+
+```bash
+docker run -d --name storage-emulator -p 10000-10002:10000-10002 \
+  mcr.microsoft.com/azure-storage/azurite \
+  azurite --skipApiVersionCheck --blobHost 0.0.0.0 --queueHost 0.0.0.0 --tableHost 0.0.0.0
+cd web
+STORAGE_CONNECTION_STRING=UseDevelopmentStorage=true npm run test:integration
+docker rm -f storage-emulator
+```
+
+Trong pipeline, kết quả test được lưu ở `test-results/*.xml` (JUnit) và hiện ở tab Tests.
+
+---
+
+## 6. Giới hạn hiện tại (nên biết)
 
 - Session lưu trong bộ nhớ (MemoryStore): chỉ ổn với **1 instance**; restart là đăng nhập lại.
 - Chưa có giới hạn số lần đăng nhập sai (rate limit).
 - F1 (free) chạy Node.js: ~60 phút CPU/ngày, 1GB RAM, không Always On (request đầu tiên chậm). Nếu app dừng vì hết quota thì nâng plan lên B1 trong repo `infra`.
 - Pipeline chưa được chạy thật trên Azure (chỉ parse YAML); Function chưa chạy qua `func start` thật trong lúc viết.
 
-## 6. Từ khó
+## 7. Từ khó
 
 | Từ | Nghĩa |
 |---|---|
