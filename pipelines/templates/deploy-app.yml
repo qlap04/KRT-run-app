@@ -24,7 +24,6 @@ stages:
   jobs:
   - deployment: Deploy
     displayName: Deploy app
-    pool: { vmImage: ubuntu-24.04 }
     environment: krtrun-${{ parameters.environment }}
     strategy:
       runOnce:

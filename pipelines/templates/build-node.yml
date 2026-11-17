@@ -2,7 +2,6 @@
 jobs:
 - job: Build
   displayName: Unit test & package
-  pool: { vmImage: ubuntu-24.04 }
   steps:
   - checkout: self
 
@@ -120,7 +119,6 @@ jobs:
 # Azurite via docker run (needs --skipApiVersionCheck; service containers cannot override CMD).
 - job: IntegrationTest
   displayName: Integration test
-  pool: { vmImage: ubuntu-24.04 }
   steps:
   - checkout: self
 
