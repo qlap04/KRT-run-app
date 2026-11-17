@@ -3,6 +3,7 @@
 variables:
   environment: dev
   resourceGroup: rg-krtrun-dev
+  apimResourceGroup: rg-krtrun-dev-apim   # APIM has its own RG (infra main.bicep)
   webAppName: krtrun-dev-web
   functionAppName: krtrun-dev-func
   apimName: krtrun-dev-apim

@@ -63,7 +63,7 @@ stages:
               scriptLocation: inlineScript
               inlineScript: |
                 az apim api import \
-                  --resource-group $(resourceGroup) \
+                  --resource-group $(apimResourceGroup) \
                   --service-name $(apimName) \
                   --api-id krtrun \
                   --path $(apiPath) \
