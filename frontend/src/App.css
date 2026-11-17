@@ -4,24 +4,31 @@
   padding: 0 1rem;
 }
 
-.auth h1 {
+.auth h1,
+.page h1 {
   margin-bottom: 1rem;
+  color: var(--text-h);
 }
 
-.auth form {
+.auth form,
+.stack-form {
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
 }
 
-.auth label {
+.auth label,
+.stack-form label,
+.month-picker {
   display: flex;
   flex-direction: column;
   gap: 0.25rem;
   font-size: 0.9rem;
 }
 
-.auth input {
+.auth input,
+.stack-form input,
+.month-picker input {
   padding: 0.5rem 0.6rem;
   border: 1px solid var(--border);
   border-radius: 4px;
@@ -29,13 +36,84 @@
   color: var(--text-h);
 }
 
-.auth button {
+.auth button,
+.stack-form button,
+.data-table button,
+.proof-close,
+.nav-logout {
   margin-top: 0.25rem;
   padding: 0.55rem 0.75rem;
   cursor: pointer;
 }
 
-.auth .error {
+.error {
   color: #b42318;
   margin: 0;
+}
+
+.ok {
+  color: #067647;
+  margin: 0;
+}
+
+.app-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 1rem;
+  align-items: center;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.app-nav a {
+  color: var(--text-h);
+  text-decoration: none;
+}
+
+.app-nav a.active {
+  font-weight: 600;
+  text-decoration: underline;
+}
+
+.nav-logout {
+  margin-left: auto;
+  margin-top: 0;
+}
+
+.page {
+  max-width: 48rem;
+  margin: 1.5rem auto;
+  padding: 0 1rem;
+}
+
+.month-picker {
+  max-width: 12rem;
+  margin-bottom: 1rem;
+}
+
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.95rem;
+}
+
+.data-table th,
+.data-table td {
+  border-bottom: 1px solid var(--border);
+  padding: 0.5rem 0.4rem;
+  text-align: left;
+}
+
+.proof-modal {
+  margin-top: 1.25rem;
+  padding: 1rem;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+}
+
+.proof-modal img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin-top: 0.75rem;
 }
