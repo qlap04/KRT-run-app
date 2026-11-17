@@ -1,8 +1,8 @@
 openapi: 3.0.1
 info:
   title: KRT-run API
-  description: API for the monthly running-proof data (company F)
-  version: 1.0.0
+  description: JSON API for the monthly running-proof portal (company F). Authenticate with a Bearer JWT from `/api/auth/login`, or with `x-api-key` on selected read endpoints.
+  version: 1.1.0
 servers:
   - url: https://REPLACE-ME.azurewebsites.net
 paths:
@@ -10,72 +10,555 @@ paths:
     get:
       operationId: health
       summary: Health check
+      security: []
       responses:
         '200':
           description: OK
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  status: { type: string, example: ok }
-                  env: { type: string, example: dev }
-                  time: { type: string, format: date-time }
+                $ref: '#/components/schemas/Health'
+
+  /api/auth/login:
+    post:
+      operationId: login
+      summary: Log in and receive a JWT
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Login succeeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+        '401':
+          description: Wrong employee code or password
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/auth/register:
+    post:
+      operationId: register
+      summary: Register a new user
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+      responses:
+        '200':
+          description: Registration succeeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OkResponse'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Employee code already registered
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/auth/me:
+    get:
+      operationId: me
+      summary: Current user from the JWT
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Authenticated user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthUser'
+        '401':
+          description: Missing or invalid Bearer token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
   /api/runs:
     get:
       operationId: listRuns
-      summary: List the submissions of a month
-      description: Send the x-api-key header (added by APIM) to see everything; otherwise a login session is required.
+      summary: List submissions for a month
+      description: With `x-api-key` (or an admin JWT) every run is returned; with a normal JWT only that user's runs are returned.
+      security:
+        - bearerAuth: []
+        - apiKey: []
       parameters:
-        - { name: month, in: query, required: false, schema: { type: string, pattern: '^\d{4}-\d{2}$' }, description: yyyy-MM }
+        - $ref: '#/components/parameters/month'
       responses:
         '200':
           description: OK
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  month: { type: string }
-                  runs:
-                    type: array
-                    items: { $ref: '#/components/schemas/Run' }
-        '401': { description: Unauthorized }
+                $ref: '#/components/schemas/RunsResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    post:
+      operationId: uploadRun
+      summary: Upload a running proof
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [proof, km, runDate]
+              properties:
+                proof:
+                  type: string
+                  format: binary
+                  description: JPG or PNG proof image (max 5MB)
+                km:
+                  type: string
+                  description: Distance in km (0.1–100); decimal comma allowed
+                  example: '5,2'
+                runDate:
+                  type: string
+                  format: date
+                  description: Run date (yyyy-MM-dd), today or within the last 62 days
+      responses:
+        '201':
+          description: Upload queued
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OkResponse'
+        '400':
+          description: Validation or upload error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Missing or invalid Bearer token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/runs/{month}/{runId}/proof:
+    get:
+      operationId: getProof
+      summary: Download a proof image
+      description: Owner or admin only. Missing or unauthorized access is answered as 404.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/monthPath'
+        - $ref: '#/components/parameters/runId'
+      responses:
+        '200':
+          description: Proof image
+          content:
+            image/jpeg:
+              schema:
+                type: string
+                format: binary
+            image/png:
+              schema:
+                type: string
+                format: binary
+        '401':
+          description: Missing or invalid Bearer token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not found or not allowed
+
   /api/leaderboard:
     get:
       operationId: leaderboard
-      summary: Leaderboard of approved km per month
+      summary: Leaderboard of approved km for a month
+      security:
+        - bearerAuth: []
+        - apiKey: []
       parameters:
-        - { name: month, in: query, required: false, schema: { type: string, pattern: '^\d{4}-\d{2}$' }, description: yyyy-MM }
+        - $ref: '#/components/parameters/month'
       responses:
         '200':
           description: OK
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  month: { type: string }
-                  rows:
-                    type: array
-                    items:
-                      type: object
-                      properties:
-                        employeeCode: { type: string }
-                        km: { type: number }
-                        runs: { type: integer }
-        '401': { description: Unauthorized }
+                $ref: '#/components/schemas/LeaderboardResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/admin/runs:
+    get:
+      operationId: adminListPendingRuns
+      summary: List runs waiting for review
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/month'
+      responses:
+        '200':
+          description: Pending review list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PendingReviewResponse'
+        '401':
+          description: Missing or invalid Bearer token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Not an admin
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/admin/audit:
+    get:
+      operationId: adminListAudit
+      summary: Audit log for a date
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: date
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date
+            pattern: '^\d{4}-\d{2}-\d{2}$'
+          description: yyyy-MM-dd (defaults to today in Vietnam time)
+      responses:
+        '200':
+          description: Audit entries
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuditResponse'
+        '401':
+          description: Missing or invalid Bearer token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Not an admin
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/admin/runs/{month}/{runId}/approve:
+    post:
+      operationId: adminApproveRun
+      summary: Approve a pending run
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/monthPath'
+        - $ref: '#/components/parameters/runId'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReviewRequest'
+      responses:
+        '200':
+          description: Approved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OkResponse'
+        '401':
+          description: Missing or invalid Bearer token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Not an admin
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Run not found
+        '409':
+          description: Run is not waiting for review
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/admin/runs/{month}/{runId}/reject:
+    post:
+      operationId: adminRejectRun
+      summary: Reject a pending run
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/monthPath'
+        - $ref: '#/components/parameters/runId'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReviewRequest'
+      responses:
+        '200':
+          description: Rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OkResponse'
+        '401':
+          description: Missing or invalid Bearer token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Not an admin
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Run not found
+        '409':
+          description: Run is not waiting for review
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
 components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT from POST /api/auth/login (payload code, fullName, role; expires in 1h)
+    apiKey:
+      type: apiKey
+      in: header
+      name: x-api-key
+      description: Service API key (APIM or configured API_KEY); grants access to all runs on GET /api/runs
+
+  parameters:
+    month:
+      name: month
+      in: query
+      required: false
+      schema:
+        type: string
+        pattern: '^\d{4}-\d{2}$'
+      description: yyyy-MM (defaults to the current month in Vietnam time)
+    monthPath:
+      name: month
+      in: path
+      required: true
+      schema:
+        type: string
+        pattern: '^\d{4}-\d{2}$'
+      description: yyyy-MM
+    runId:
+      name: runId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+      description: Run id (UUID)
+
   schemas:
+    Health:
+      type: object
+      required: [status, env, time]
+      properties:
+        status: { type: string, example: ok }
+        env: { type: string, example: dev }
+        time: { type: string, format: date-time }
+
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error: { type: string }
+
+    OkResponse:
+      type: object
+      required: [ok]
+      properties:
+        ok: { type: boolean, enum: [true] }
+
+    AuthUser:
+      type: object
+      required: [code, role]
+      properties:
+        code: { type: string, example: F001 }
+        fullName: { type: string, example: Ann Nguyen }
+        role:
+          type: string
+          enum: [user, admin]
+
+    LoginRequest:
+      type: object
+      required: [employeeCode, password]
+      properties:
+        employeeCode: { type: string, minLength: 3, maxLength: 20 }
+        password: { type: string, minLength: 8, maxLength: 72 }
+
+    LoginResponse:
+      type: object
+      required: [token, user]
+      properties:
+        token: { type: string, description: HS256 JWT }
+        user:
+          type: object
+          required: [code, fullName, role]
+          properties:
+            code: { type: string }
+            fullName: { type: string }
+            role: { type: string, enum: [user, admin] }
+
+    RegisterRequest:
+      type: object
+      required: [employeeCode, fullName, password, password2]
+      properties:
+        employeeCode: { type: string, minLength: 3, maxLength: 20 }
+        fullName: { type: string, maxLength: 80 }
+        password: { type: string, minLength: 8, maxLength: 72 }
+        password2: { type: string, minLength: 8, maxLength: 72 }
+
+    RunStatus:
+      type: string
+      enum: [PENDING_PROCESSING, PENDING_REVIEW, REJECTED_INVALID, APPROVED, REJECTED]
+
     Run:
       type: object
       properties:
-        runId: { type: string }
-        month: { type: string }
+        runId: { type: string, format: uuid }
+        month: { type: string, pattern: '^\d{4}-\d{2}$' }
         employeeCode: { type: string }
         km: { type: number }
         runDate: { type: string, format: date }
-        status:
-          type: string
-          enum: [PENDING_PROCESSING, PENDING_REVIEW, REJECTED_INVALID, APPROVED, REJECTED]
+        status: { $ref: '#/components/schemas/RunStatus' }
         createdUtc: { type: string, format: date-time }
+
+    RunsResponse:
+      type: object
+      required: [month, runs]
+      properties:
+        month: { type: string, pattern: '^\d{4}-\d{2}$' }
+        runs:
+          type: array
+          items: { $ref: '#/components/schemas/Run' }
+
+    LeaderboardRow:
+      type: object
+      required: [employeeCode, km, runs]
+      properties:
+        employeeCode: { type: string }
+        km: { type: number }
+        runs: { type: integer }
+
+    LeaderboardResponse:
+      type: object
+      required: [month, rows]
+      properties:
+        month: { type: string, pattern: '^\d{4}-\d{2}$' }
+        rows:
+          type: array
+          items: { $ref: '#/components/schemas/LeaderboardRow' }
+
+    PendingRun:
+      type: object
+      description: Full run entity waiting for admin review
+      properties:
+        partitionKey: { type: string, description: Month yyyy-MM }
+        rowKey: { type: string, format: uuid, description: Run id }
+        employeeCode: { type: string }
+        fullName: { type: string }
+        km: { type: number }
+        runDate: { type: string, format: date }
+        status: { $ref: '#/components/schemas/RunStatus' }
+        originalName: { type: string }
+        contentType: { type: string }
+        blobContainer: { type: string }
+        blobPath: { type: string }
+        createdUtc: { type: string, format: date-time }
+
+    PendingReviewResponse:
+      type: object
+      required: [month, list]
+      properties:
+        month: { type: string, pattern: '^\d{4}-\d{2}$' }
+        list:
+          type: array
+          items: { $ref: '#/components/schemas/PendingRun' }
+
+    ReviewRequest:
+      type: object
+      properties:
+        note:
+          type: string
+          maxLength: 200
+          description: Optional review note
+
+    AuditEntry:
+      type: object
+      properties:
+        partitionKey: { type: string, format: date, description: UTC date yyyy-MM-dd }
+        rowKey: { type: string }
+        action: { type: string }
+        actor: { type: string }
+        runId: { type: string }
+        km: {}
+        runDate: { type: string }
+        result: { type: string }
+        clientIp: { type: string }
+        detail: { type: string }
+
+    AuditResponse:
+      type: object
+      required: [date, rows]
+      properties:
+        date: { type: string, format: date }
+        rows:
+          type: array
+          items: { $ref: '#/components/schemas/AuditEntry' }
