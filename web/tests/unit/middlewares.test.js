@@ -5,6 +5,7 @@ const { fakeReq, fakeRes } = require('../helpers/http');
 const { requireLogin, requireAdmin, clientIp } = require('../../src/middlewares/auth');
 const { csrfToken, verifyCsrf } = require('../../src/middlewares/csrf');
 const { notFound, errorHandler } = require('../../src/middlewares/errorHandler');
+const { proofUploadError } = require('../../src/middlewares/upload');
 
 describe('auth middleware', () => {
   it('requireLogin redirects anonymous users to /login and lets users through', () => {
@@ -78,5 +79,26 @@ describe('error handler', () => {
     errorHandler(new Error('secret detail'), { path: '/runs' }, page, () => {});
     assert.equal(page.statusCode, 500);
     assert.doesNotMatch(JSON.stringify(page.rendered), /secret detail/);
+  });
+});
+
+describe('proofUpload errors', () => {
+  it('returns 400 JSON when the URL is under /api/', () => {
+    const req = fakeReq();
+    req.originalUrl = '/api/runs';
+    const res = fakeRes();
+    proofUploadError({ code: 'LIMIT_FILE_SIZE' }, req, res);
+    assert.equal(res.statusCode, 400);
+    assert.deepEqual(res.body, { error: 'Image too large (max 5MB)' });
+    assert.equal(res.rendered, null);
+  });
+  it('still renders the EJS upload form outside /api/', () => {
+    const req = fakeReq();
+    req.originalUrl = '/upload';
+    const res = fakeRes();
+    proofUploadError({ code: 'LIMIT_FILE_SIZE' }, req, res);
+    assert.equal(res.statusCode, 400);
+    assert.equal(res.rendered.view, 'runs/upload');
+    assert.equal(res.rendered.data.error, 'Image too large (max 5MB)');
   });
 });

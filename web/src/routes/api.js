@@ -1,5 +1,6 @@
 'use strict';
 const express = require('express');
+const { proofUpload } = require('../middlewares/upload');
 
 module.exports = function apiRoutes({ apiController, requireAuth }) {
   const r = express.Router();
@@ -9,6 +10,8 @@ module.exports = function apiRoutes({ apiController, requireAuth }) {
   r.post('/api/auth/register', apiController.register);
   r.get('/api/auth/me', requireAuth, apiController.me);
   r.get('/api/runs', apiController.apiAuth, apiController.runs);
+  r.post('/api/runs', requireAuth, proofUpload, apiController.upload);
+  r.get('/api/runs/:month/:runId/proof', requireAuth, apiController.proof);
   r.get('/api/leaderboard', apiController.apiAuth, apiController.leaderboard);
   return r;
 };

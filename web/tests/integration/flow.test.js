@@ -221,7 +221,7 @@ describe('web + storage integration', { skip: SKIP }, () => {
 
   describe('end-to-end flow (ordered steps in one test)', () => {
     it('upload -> function processing -> proof -> admin approval -> leaderboard', async () => {
-      const { agent, code } = await newUser('RUN');
+      const { agent, code, password } = await newUser('RUN');
       const admin = request.agent(app);
       await login(admin, adminCode, adminPassword).then((r) => assert.equal(r.status, 302));
 
@@ -271,7 +271,10 @@ describe('web + storage integration', { skip: SKIP }, () => {
       // 5) leaderboard shows the approved km for this user
       const lb = await request(app).get(`/api/leaderboard?month=${month}`).set('x-api-key', apiKey).expect(200);
       assert.deepEqual(lb.body.rows.find((r) => r.employeeCode === code), { employeeCode: code, km: 5.2, runs: 1 });
-      const mine = await agent.get(`/api/runs?month=${month}`).expect(200);
+      const { body: { token } } = await request(app).post('/api/auth/login')
+        .send({ employeeCode: code, password }).expect(200);
+      const mine = await request(app).get(`/api/runs?month=${month}`)
+        .set('Authorization', `Bearer ${token}`).expect(200);
       assert.deepEqual(mine.body.runs.map((r) => r.runId), [msg.runId]);
 
       // 6) audit trail has every step, and re-processing the same message is a no-op

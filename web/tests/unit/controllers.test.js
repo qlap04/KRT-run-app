@@ -7,9 +7,11 @@ const { createAuthController } = require('../../src/controllers/authController')
 const { createAdminController } = require('../../src/controllers/adminController');
 
 describe('apiController', () => {
+  const denyAuth = (req, res) => res.status(401).json({ error: 'unauthorized' });
   const make = (cfg = {}, extras = {}) => createApiController({
     cfg: { appEnv: 'dev', apiKey: 'k-123', ...cfg },
     runService: {},
+    requireAuth: denyAuth,
     ...extras,
   });
   const run = (controller, req) => {
@@ -31,13 +33,18 @@ describe('apiController', () => {
     assert.equal(next.mock.callCount(), 1);
     assert.equal(req.apiAll, true);
   });
-  it('apiAuth lets a logged-in session through without apiAll', () => {
-    const req = fakeReq({ session: { user: { code: 'F001' } } });
-    const { next } = run(make(), req);
+  it('apiAuth falls back to requireAuth for a Bearer JWT and sets req.user', () => {
+    const requireAuth = (req, res, next) => {
+      req.user = { code: 'F001', role: 'user' };
+      next();
+    };
+    const req = fakeReq({ headers: { authorization: 'Bearer token' } });
+    const { next } = run(make({}, { requireAuth }), req);
     assert.equal(next.mock.callCount(), 1);
+    assert.deepEqual(req.user, { code: 'F001', role: 'user' });
     assert.equal(req.apiAll, undefined);
   });
-  it('apiAuth answers 401 for a wrong key and no session', () => {
+  it('apiAuth answers 401 for a wrong key and failed Bearer auth', () => {
     const { res, next } = run(make(), fakeReq({ headers: { 'x-api-key': 'wrong' } }));
     assert.equal(res.statusCode, 401);
     assert.deepEqual(res.body, { error: 'unauthorized' });
@@ -104,17 +111,70 @@ describe('apiController', () => {
     make().me(req, res);
     assert.deepEqual(res.body, { code: 'F001', role: 'user' });
   });
-  it('runs passes the query and the auth context to the service and returns JSON', async () => {
+  it('runs passes the query and req.user to the service and returns JSON', async () => {
     const runService = { apiRuns: mock.fn(async () => ({ month: '2026-11', runs: [] })) };
-    const controller = createApiController({ cfg: {}, runService });
+    const controller = createApiController({ cfg: {}, runService, requireAuth: denyAuth });
     const res = fakeRes();
-    await controller.runs(fakeReq({ query: { month: '2026-11' }, session: { user: { code: 'F001' } } }), res, mock.fn());
+    const req = fakeReq({ query: { month: '2026-11' } });
+    req.user = { code: 'F001', role: 'user' };
+    await controller.runs(req, res, mock.fn());
     assert.deepEqual(res.body, { month: '2026-11', runs: [] });
-    assert.equal(runService.apiRuns.mock.calls[0].arguments[0].monthQuery, '2026-11');
+    assert.deepEqual(runService.apiRuns.mock.calls[0].arguments[0], {
+      monthQuery: '2026-11',
+      apiAll: undefined,
+      sessionUser: req.user,
+    });
+  });
+  it('upload returns 201 on success and 400 JSON on validation errors', async () => {
+    const user = { code: 'F001', role: 'user' };
+    const okService = {
+      upload: mock.fn(async () => ({ ok: true })),
+    };
+    const okReq = fakeReq({ body: { km: '5', runDate: '2026-11-01' } });
+    okReq.user = user;
+    okReq.file = { buffer: Buffer.from([1]), originalname: 'a.jpg' };
+    const okRes = fakeRes();
+    await make({}, { runService: okService }).upload(okReq, okRes, mock.fn());
+    assert.equal(okRes.statusCode, 201);
+    assert.deepEqual(okRes.body, { ok: true });
+    assert.equal(okService.upload.mock.calls[0].arguments[0].user, user);
+
+    const badService = { upload: async () => ({ ok: false, error: 'Distance must be between 0.1 and 100 km' }) };
+    const badReq = fakeReq({ body: { km: '0' } });
+    badReq.user = user;
+    const badRes = fakeRes();
+    await make({}, { runService: badService }).upload(badReq, badRes, mock.fn());
+    assert.equal(badRes.statusCode, 400);
+    assert.deepEqual(badRes.body, { error: 'Distance must be between 0.1 and 100 km' });
+  });
+  it('proof streams the image and answers 404 when missing', async () => {
+    const stream = {
+      on(event, fn) { if (event === 'error') this._onError = fn; return this; },
+      pipe(dest) { this.dest = dest; return dest; },
+    };
+    const runService = {
+      openProof: mock.fn(async () => ({ contentType: 'image/jpeg', stream })),
+    };
+    const req = fakeReq({ params: { month: '2026-11', runId: '11111111-1111-1111-1111-111111111111' } });
+    req.user = { code: 'F001', role: 'user' };
+    const res = fakeRes();
+    await make({}, { runService }).proof(req, res, mock.fn());
+    assert.equal(res.headers['content-type'], 'image/jpeg');
+    assert.equal(stream.dest, res);
+    assert.equal(runService.openProof.mock.calls[0].arguments[0].user, req.user);
+
+    const missing = fakeRes();
+    await make({}, { runService: { openProof: async () => ({ notFound: true }) } })
+      .proof(req, missing, mock.fn());
+    assert.equal(missing.statusCode, 404);
   });
   it('forwards service errors to next()', async () => {
     const boom = new Error('boom');
-    const controller = createApiController({ cfg: {}, runService: { apiLeaderboard: async () => { throw boom; } } });
+    const controller = createApiController({
+      cfg: {},
+      runService: { apiLeaderboard: async () => { throw boom; } },
+      requireAuth: denyAuth,
+    });
     const next = mock.fn();
     await controller.leaderboard(fakeReq(), fakeRes(), next);
     assert.equal(next.mock.calls[0].arguments[0], boom);

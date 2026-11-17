@@ -45,7 +45,7 @@ function createApp(deps) {
   const authController = createAuthController({ authService });
   const runController = createRunController({ runService });
   const adminController = createAdminController({ runService, auditService });
-  const apiController = createApiController({ cfg, runService, authService, signToken });
+  const apiController = createApiController({ cfg, runService, authService, signToken, requireAuth });
 
   app.use(require('./routes/api')({ apiController, requireAuth }));
   app.use(require('./routes/auth')({ authController }));

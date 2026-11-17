@@ -4,7 +4,7 @@ const jwt = require('jsonwebtoken');
 function createJwt({ cfg }) {
   function signToken(user) {
     return jwt.sign(
-      { code: user.code, role: user.role },
+      { code: user.code, fullName: user.fullName, role: user.role },
       cfg.sessionSecret,
       { expiresIn: '1h', algorithm: 'HS256' },
     );
@@ -16,7 +16,7 @@ function createJwt({ cfg }) {
     if (!match) return res.status(401).json({ error: 'unauthorized' });
     try {
       const payload = jwt.verify(match[1], cfg.sessionSecret, { algorithms: ['HS256'] });
-      req.user = { code: payload.code, role: payload.role };
+      req.user = { code: payload.code, fullName: payload.fullName, role: payload.role };
       return next();
     } catch {
       return res.status(401).json({ error: 'unauthorized' });

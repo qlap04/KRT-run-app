@@ -7,12 +7,14 @@ function safeEqual(a, b) {
   return x.length === y.length && crypto.timingSafeEqual(x, y);
 }
 
-function createApiController({ cfg, runService, authService, signToken }) {
+function createApiController({ cfg, runService, authService, signToken, requireAuth }) {
   function apiAuth(req, res, next) {
     const key = req.get('x-api-key');
-    if (cfg.apiKey && key && safeEqual(key, cfg.apiKey)) { req.apiAll = true; return next(); }
-    if (req.session.user) return next();
-    res.status(401).json({ error: 'unauthorized' });
+    if (cfg.apiKey && key && safeEqual(key, cfg.apiKey)) {
+      req.apiAll = true;
+      return next();
+    }
+    return requireAuth(req, res, next);
   }
 
   return {
@@ -63,10 +65,41 @@ function createApiController({ cfg, runService, authService, signToken }) {
         const data = await runService.apiRuns({
           monthQuery: req.query.month,
           apiAll: req.apiAll,
-          sessionUser: req.session.user,
+          sessionUser: req.user,
         });
         res.json(data);
       } catch (e) { next(e); }
+    },
+
+    async upload(req, res, next) {
+      try {
+        const result = await runService.upload({
+          user: req.user,
+          km: req.body.km,
+          runDate: req.body.runDate,
+          file: req.file,
+          clientIp: clientIp(req),
+        });
+        if (!result.ok) {
+          return res.status(400).json({ error: result.error });
+        }
+        res.status(201).json({ ok: true });
+      } catch (e) { next(e); }
+    },
+
+    async proof(req, res, next) {
+      try {
+        const result = await runService.openProof({
+          month: req.params.month,
+          runId: req.params.runId,
+          user: req.user,
+        });
+        if (result.notFound) return res.sendStatus(404);
+        res.setHeader('Content-Type', result.contentType);
+        res.setHeader('Cache-Control', 'private, max-age=300');
+        res.setHeader('X-Content-Type-Options', 'nosniff');
+        result.stream.on('error', next).pipe(res);
+      } catch (e) { e.statusCode === 404 ? res.sendStatus(404) : next(e); }
     },
 
     async leaderboard(req, res, next) {

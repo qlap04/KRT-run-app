@@ -9,10 +9,11 @@ const cfg = { sessionSecret: 'test-session-secret-for-jwt' };
 const { signToken, requireAuth, requireAdminApi } = createJwt({ cfg });
 
 describe('signToken', () => {
-  it('signs a HS256 token with code and role that expires in about 1h', () => {
-    const token = signToken({ code: 'F001', role: 'user' });
+  it('signs a HS256 token with code, fullName and role that expires in about 1h', () => {
+    const token = signToken({ code: 'F001', fullName: 'Ann', role: 'user' });
     const decoded = jwt.verify(token, cfg.sessionSecret, { algorithms: ['HS256'] });
     assert.equal(decoded.code, 'F001');
+    assert.equal(decoded.fullName, 'Ann');
     assert.equal(decoded.role, 'user');
     assert.equal(jwt.decode(token, { complete: true }).header.alg, 'HS256');
     const ttl = decoded.exp - decoded.iat;
@@ -22,12 +23,12 @@ describe('signToken', () => {
 
 describe('requireAuth', () => {
   it('accepts a valid Bearer token and sets req.user', () => {
-    const token = signToken({ code: 'F001', role: 'user' });
+    const token = signToken({ code: 'F001', fullName: 'Ann', role: 'user' });
     const req = fakeReq({ headers: { authorization: `Bearer ${token}` } });
     const next = mock.fn();
     requireAuth(req, fakeRes(), next);
     assert.equal(next.mock.callCount(), 1);
-    assert.deepEqual(req.user, { code: 'F001', role: 'user' });
+    assert.deepEqual(req.user, { code: 'F001', fullName: 'Ann', role: 'user' });
   });
 
   for (const [name, headers] of [
@@ -36,11 +37,11 @@ describe('requireAuth', () => {
     ['an empty Bearer token', { authorization: 'Bearer ' }],
     ['a malformed token', { authorization: 'Bearer not-a-jwt' }],
     ['a token signed with another secret', {
-      authorization: `Bearer ${jwt.sign({ code: 'F001', role: 'user' }, 'other-secret', { expiresIn: '1h', algorithm: 'HS256' })}`,
+      authorization: `Bearer ${jwt.sign({ code: 'F001', fullName: 'Ann', role: 'user' }, 'other-secret', { expiresIn: '1h', algorithm: 'HS256' })}`,
     }],
     ['an expired token', {
       authorization: `Bearer ${jwt.sign(
-        { code: 'F001', role: 'user', exp: Math.floor(Date.now() / 1000) - 10 },
+        { code: 'F001', fullName: 'Ann', role: 'user', exp: Math.floor(Date.now() / 1000) - 10 },
         cfg.sessionSecret,
         { algorithm: 'HS256' },
       )}`,
