@@ -1,5 +1,5 @@
 'use strict';
-// Integration tests: real Express app + real Blob/Queue/Table clients against a storage emulator (Azurite).
+// Integration tests: real Express API + real Blob/Queue/Table clients against a storage emulator (Azurite).
 //
 // Configuration comes ONLY from environment variables:
 //   STORAGE_CONNECTION_STRING   required, e.g. UseDevelopmentStorage=true with Azurite running
@@ -7,7 +7,7 @@
 //
 // Every run creates its own containers, queue and tables (random suffix) and deletes them in after(),
 // so runs never share data. Each test registers its own users, so tests do not depend on each other.
-// The only ordered scenario is the single end-to-end flow test.
+// Auth is JWT Bearer for every authenticated step. The only ordered scenario is the end-to-end flow test.
 const { describe, it, before, after } = require('node:test');
 const assert = require('node:assert/strict');
 const crypto = require('node:crypto');
@@ -33,37 +33,32 @@ describe('web + storage integration', { skip: SKIP }, () => {
   const adminCode = `ADM${suffix}`;
   const apiKey = crypto.randomBytes(16).toString('hex');
   const adminPassword = newPassword();
-  let cfg, storage, app, runs, audit, processMessage, todayVN;
+  let cfg, storage, app, runs, audit, processMessage, todayVN, adminToken;
 
-  const csrfFrom = async (agent, path) => {
-    const res = await agent.get(path).expect(200);
-    const m = /name="_csrf" value="([^"]+)"/.exec(res.text);
-    assert.ok(m, `no csrf token found at ${path}`);
-    return m[1];
-  };
-  const register = async (agent, code, password, fullName = 'Test User') => {
-    const t = await csrfFrom(agent, '/register');
-    return agent.post('/register').type('form')
-      .send({ _csrf: t, employeeCode: code, fullName, password, password2: password });
-  };
-  const login = async (agent, code, password) => {
-    const t = await csrfFrom(agent, '/login');
-    return agent.post('/login').type('form').send({ _csrf: t, employeeCode: code, password });
-  };
-  // Registers a brand-new user and returns a logged-in agent for it.
+  const register = (code, password, fullName = 'Test User') => (
+    request(app).post('/api/auth/register')
+      .send({ employeeCode: code, fullName, password, password2: password })
+  );
+  const login = (code, password) => (
+    request(app).post('/api/auth/login').send({ employeeCode: code, password })
+  );
+  const bearer = (token) => ({ Authorization: `Bearer ${token}` });
+  // Registers a brand-new user and returns its JWT.
   const newUser = async (prefix = 'U') => {
     const code = `${prefix}${rand()}`;
     const password = newPassword();
-    const agent = request.agent(app);
-    await register(agent, code, password).then((r) => assert.equal(r.status, 302));
-    await login(agent, code, password).then((r) => assert.equal(r.status, 302));
-    return { agent, code, password };
+    await register(code, password).expect(200);
+    const { body } = await login(code, password).expect(200);
+    assert.ok(body.token);
+    return { code, password, token: body.token };
   };
-  const upload = async (agent, { km = '5,2', runDate = todayVN(), file = JPG, filename = 'run.jpg' } = {}) => {
-    const t = await csrfFrom(agent, '/upload');
-    return agent.post('/upload').field('_csrf', t).field('runDate', runDate).field('km', km)
-      .attach('proof', file, { filename, contentType: 'image/jpeg' });
-  };
+  const upload = (token, { km = '5,2', runDate = todayVN(), file = JPG, filename = 'run.jpg' } = {}) => (
+    request(app).post('/api/runs')
+      .set(bearer(token))
+      .field('runDate', runDate)
+      .field('km', km)
+      .attach('proof', file, { filename, contentType: 'image/jpeg' })
+  );
   const listBlobs = async (container, prefix = '') => {
     const names = [];
     for await (const b of container.listBlobsFlat({ prefix })) names.push(b.name);
@@ -118,7 +113,8 @@ describe('web + storage integration', { skip: SKIP }, () => {
     app = createApp({ cfg, authService, runService, auditService });
 
     // Fixture: one admin for this run (registering ADMIN_CODE gives the admin role).
-    await register(request.agent(app), adminCode, adminPassword, 'Admin').then((r) => assert.equal(r.status, 302));
+    await register(adminCode, adminPassword, 'Admin').expect(200);
+    ({ body: { token: adminToken } } = await login(adminCode, adminPassword).expect(200));
   });
 
   after(async () => {
@@ -135,17 +131,14 @@ describe('web + storage integration', { skip: SKIP }, () => {
       assert.equal(r.body.status, 'ok');
       assert.equal(r.body.env, 'dev');
     });
-    it('unknown pages answer 404', async () => {
-      await request(app).get(`/no-such-page-${suffix}`).expect(404);
+    it('unknown paths answer 404 JSON', async () => {
+      const r = await request(app).get(`/no-such-page-${suffix}`).expect(404);
+      assert.deepEqual(r.body, { error: 'not found' });
     });
   });
 
   describe('access control', () => {
-    it('anonymous users are redirected to /login', async () => {
-      await request(app).get('/runs').expect(302).expect('Location', '/login');
-      await request(app).get('/admin').expect(302).expect('Location', '/login');
-    });
-    it('the API answers 401 without a session or API key, and 401 with a wrong key', async () => {
+    it('the API answers 401 without a JWT or API key, and 401 with a wrong key', async () => {
       await request(app).get('/api/runs').expect(401);
       await request(app).get('/api/leaderboard').set('x-api-key', 'wrong').expect(401);
     });
@@ -153,15 +146,10 @@ describe('web + storage integration', { skip: SKIP }, () => {
       const r = await request(app).get('/api/leaderboard').set('x-api-key', apiKey).expect(200);
       assert.ok(Array.isArray(r.body.rows));
     });
-    it('a normal user cannot open the admin pages (403)', async () => {
-      const { agent } = await newUser();
-      await agent.get('/admin').expect(403);
-      await agent.get('/admin/audit').expect(403);
-    });
-    it('POST without a CSRF token is rejected (403)', async () => {
-      const agent = request.agent(app);
-      await agent.get('/login').expect(200); // creates the session
-      await agent.post('/login').type('form').send({ employeeCode: 'x', password: 'y' }).expect(403);
+    it('a normal user cannot call admin APIs (403)', async () => {
+      const { token } = await newUser();
+      await request(app).get('/api/admin/runs').set(bearer(token)).expect(403);
+      await request(app).get('/api/admin/audit').set(bearer(token)).expect(403);
     });
   });
 
@@ -179,59 +167,58 @@ describe('web + storage integration', { skip: SKIP }, () => {
     });
     it('rejects a duplicate employee code', async () => {
       const { code } = await newUser();
-      const r = await register(request.agent(app), code, newPassword());
-      assert.equal(r.status, 400);
-      assert.match(r.text, /already registered/);
+      const r = await register(code, newPassword());
+      assert.equal(r.status, 409);
+      assert.match(r.body.error, /already registered/);
     });
     it('rejects a wrong password with 401 and writes a FAILED audit record', async () => {
       const { code } = await newUser();
-      const r = await login(request.agent(app), code, 'wrong-password');
+      const r = await login(code, 'wrong-password');
       assert.equal(r.status, 401);
+      assert.equal(r.body.error, 'Wrong employee code or password');
       const failed = (await listAll(storage.audit)).filter((e) => e.actor === code && e.result === 'FAILED');
       assert.equal(failed.length, 1);
     });
-    it('logout ends the session', async () => {
-      const { agent } = await newUser();
-      await agent.get('/runs').expect(200);
-      const t = await csrfFrom(agent, '/runs');
-      await agent.post('/logout').type('form').send({ _csrf: t }).expect(302).expect('Location', '/login');
-      await agent.get('/runs').expect(302).expect('Location', '/login');
+    it('GET /api/auth/me returns the JWT user', async () => {
+      const { token, code } = await newUser();
+      const r = await request(app).get('/api/auth/me').set(bearer(token)).expect(200);
+      assert.equal(r.body.code, code);
+      assert.equal(r.body.role, 'user');
     });
   });
 
   describe('upload validation', () => {
     it('rejects a non-image file and stores nothing for that user', async () => {
-      const { agent, code } = await newUser();
+      const { token, code } = await newUser();
       const before = (await listBlobs(storage.blobs)).length;
-      await upload(agent, { file: Buffer.from('this is not an image') }).then((r) => assert.equal(r.status, 400));
+      await upload(token, { file: Buffer.from('this is not an image') }).then((r) => assert.equal(r.status, 400));
       assert.equal((await listBlobs(storage.blobs)).length, before);
       assert.deepEqual(await queueMessagesFor(code), []);
       assert.deepEqual((await listAll(storage.runs)).filter((r) => r.employeeCode === code), []);
     });
     it('rejects an invalid distance and a future date', async () => {
-      const { agent, code } = await newUser();
-      await upload(agent, { km: '500' }).then((r) => assert.equal(r.status, 400));
-      await upload(agent, { runDate: '2999-01-01' }).then((r) => assert.equal(r.status, 400));
+      const { token, code } = await newUser();
+      await upload(token, { km: '500' }).then((r) => assert.equal(r.status, 400));
+      await upload(token, { runDate: '2999-01-01' }).then((r) => assert.equal(r.status, 400));
       assert.deepEqual((await listAll(storage.runs)).filter((r) => r.employeeCode === code), []);
     });
-    it('requires a login to upload', async () => {
-      await request(app).get('/upload').expect(302).expect('Location', '/login');
+    it('requires a JWT to upload', async () => {
+      await request(app).post('/api/runs')
+        .field('runDate', todayVN())
+        .field('km', '5')
+        .attach('proof', JPG, { filename: 'run.jpg', contentType: 'image/jpeg' })
+        .expect(401);
     });
   });
 
   describe('end-to-end flow (ordered steps in one test)', () => {
     it('upload -> function processing -> proof -> admin approval -> leaderboard', async () => {
-      const { agent, code, password } = await newUser('RUN');
-      const admin = request.agent(app);
-      await login(admin, adminCode, adminPassword).then((r) => assert.equal(r.status, 302));
+      const { token, code, password } = await newUser('RUN');
 
       // 1) upload: blob under incoming/, queue message, run PENDING_PROCESSING
       const day = todayVN();
       const month = day.slice(0, 7);
-      await upload(agent, { km: '5,2', runDate: day }).then((r) => {
-        assert.equal(r.status, 302);
-        assert.equal(r.headers.location, '/upload?ok=1');
-      });
+      await upload(token, { km: '5,2', runDate: day }).expect(201);
       const [msg, ...others] = await queueMessagesFor(code);
       assert.equal(others.length, 0, 'exactly one queue message for this user');
       assert.equal(msg.km, 5.2);
@@ -252,29 +239,43 @@ describe('web + storage integration', { skip: SKIP }, () => {
       assert.equal(run.blobContainer, cfg.names.blobContainer);
 
       // 3) the owner can open the proof; another user gets 404
-      const proof = await agent.get(`/proof/${month}/${msg.runId}`).buffer(true).parse((res, cb) => {
-        const chunks = [];
-        res.on('data', (c) => chunks.push(c));
-        res.on('end', () => cb(null, Buffer.concat(chunks)));
-      }).expect(200);
+      const proof = await request(app)
+        .get(`/api/runs/${month}/${msg.runId}/proof`)
+        .set(bearer(token))
+        .buffer(true)
+        .parse((res, cb) => {
+          const chunks = [];
+          res.on('data', (c) => chunks.push(c));
+          res.on('end', () => cb(null, Buffer.concat(chunks)));
+        })
+        .expect(200);
       assert.equal(proof.headers['content-type'], 'image/jpeg');
       assert.deepEqual(proof.body, JPG);
       const stranger = await newUser();
-      await stranger.agent.get(`/proof/${month}/${msg.runId}`).expect(404);
+      await request(app)
+        .get(`/api/runs/${month}/${msg.runId}/proof`)
+        .set(bearer(stranger.token))
+        .expect(404);
 
       // 4) admin approves; approving twice conflicts
-      const t = await csrfFrom(admin, '/admin');
-      await admin.post(`/admin/runs/${month}/${msg.runId}/approve`).type('form').send({ _csrf: t }).expect(302);
+      await request(app)
+        .post(`/api/admin/runs/${month}/${msg.runId}/approve`)
+        .set(bearer(adminToken))
+        .send({ note: 'looks good' })
+        .expect(200);
       assert.equal((await runs.get(month, msg.runId)).status, 'APPROVED');
-      await admin.post(`/admin/runs/${month}/${msg.runId}/approve`).type('form').send({ _csrf: t }).expect(409);
+      await request(app)
+        .post(`/api/admin/runs/${month}/${msg.runId}/approve`)
+        .set(bearer(adminToken))
+        .send({ note: 'again' })
+        .expect(409);
 
       // 5) leaderboard shows the approved km for this user
       const lb = await request(app).get(`/api/leaderboard?month=${month}`).set('x-api-key', apiKey).expect(200);
       assert.deepEqual(lb.body.rows.find((r) => r.employeeCode === code), { employeeCode: code, km: 5.2, runs: 1 });
-      const { body: { token } } = await request(app).post('/api/auth/login')
-        .send({ employeeCode: code, password }).expect(200);
+      const { body: { token: freshToken } } = await login(code, password).expect(200);
       const mine = await request(app).get(`/api/runs?month=${month}`)
-        .set('Authorization', `Bearer ${token}`).expect(200);
+        .set(bearer(freshToken)).expect(200);
       assert.deepEqual(mine.body.runs.map((r) => r.runId), [msg.runId]);
 
       // 6) audit trail has every step, and re-processing the same message is a no-op

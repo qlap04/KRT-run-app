@@ -1,7 +1,7 @@
 {
   "name": "krtrun-web",
   "version": "1.0.0",
-  "description": "KRT-run - monthly running proof portal (Express monolith)",
+  "description": "KRT-run - monthly running proof portal (Express JSON API)",
   "main": "server.js",
   "private": true,
   "engines": {
@@ -21,9 +21,7 @@
     "@azure/storage-blob": "^12.34.0",
     "@azure/storage-queue": "^12.32.0",
     "bcryptjs": "^3.0.3",
-    "ejs": "^7.0.2",
     "express": "^5.3.0",
-    "express-session": "^1.19.0",
     "jsonwebtoken": "^9.0.3",
     "multer": "^2.5.0"
   },

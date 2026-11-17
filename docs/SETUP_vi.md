@@ -1,12 +1,13 @@
 # KRT-run (repo `app`) – Hướng dẫn
 
-Repo này chứa **code ứng dụng**: web **Express (EJS)** + **Azure Function (Node v4)** chạy Node.js 22, dùng Blob / Queue / Table, và pipeline **app-deploy**. Hạ tầng (Bicep + provision) nằm ở repo riêng `infra`.
+Repo này chứa **code ứng dụng**: web **Express JSON API** + **frontend React (Vite)** + **Azure Function (Node v4)** chạy Node.js 22, dùng Blob / Queue / Table, và pipeline **app-deploy**. Hạ tầng (Bicep + provision) nằm ở repo riêng `infra`.
 
 ```
 app/
 ├── AGENTS.md              # luật cho Cursor (giống CLAUDE.md)
 ├── .cursor/rules/node.mdc
-├── web/                   # Express monolith (UI + API + openapi.yaml)
+├── web/                   # Express JSON API + openapi.yaml
+├── frontend/              # React SPA (Vite), JWT Bearer
 ├── function/              # Function xử lý queue upload-jobs
 ├── pipelines/             # app-deploy.yml, templates/, variables/<env>.yml
 └── docs/SETUP_vi.md
@@ -28,7 +29,7 @@ Luồng nghiệp vụ: Nhân viên upload ảnh + km + ngày chạy → web lưu
 | `QUEUE_NAME` | Tên queue | `upload-jobs` |
 | `BLOB_CONTAINER` | Tên container duy nhất chứa ảnh. Ảnh mới nằm ở `incoming/`, ảnh đã xử lý nằm ở `processed/` | `proofs` |
 | `TABLE_USERS` / `TABLE_RUNS` / `TABLE_AUDIT` | Tên table | `Users` / `Runs` / `AuditLog` |
-| `SESSION_SECRET` | Khoá ký session (**secret**, bắt buộc khi `APP_ENV=prod`) | chuỗi ngẫu nhiên dài |
+| `SESSION_SECRET` | Khoá ký JWT (**secret**, bắt buộc khi `APP_ENV=prod`) | chuỗi ngẫu nhiên dài |
 | `ADMIN_CODE` | Mã nhân viên đăng ký đầu tiên sẽ thành admin (**secret**) | `ADMIN01` |
 | `API_KEY` | Key cho APIM gọi `/api/*` qua header `x-api-key` (**secret**) | chuỗi ngẫu nhiên |
 
@@ -103,7 +104,7 @@ Có 2 loại test, dùng `node:test` (không cần thêm thư viện):
 | **Integration test** (chỉ trong `web/`) | `npm run test:integration` | Cần storage emulator (Azurite) và biến `STORAGE_CONNECTION_STRING`. |
 
 Quy tắc cho dễ nhớ:
-- **Không ghi cứng** connection string hay secret trong file test. Mọi cấu hình của integration test lấy từ biến môi trường. Mật khẩu, session secret và API key của test được tạo ngẫu nhiên lúc chạy.
+- **Không ghi cứng** connection string hay secret trong file test. Mọi cấu hình của integration test lấy từ biến môi trường. Mật khẩu, JWT secret và API key của test được tạo ngẫu nhiên lúc chạy. Integration test dùng JWT Bearer cho mọi bước cần đăng nhập.
 - Nếu chưa có `STORAGE_CONNECTION_STRING` thì integration test **tự bỏ qua** và in lý do. Đặt `INTEGRATION_REQUIRED=true` nếu muốn nó báo lỗi thay vì bỏ qua (pipeline đang đặt như vậy).
 - Mỗi lần chạy, test tạo container, queue, table có **tên ngẫu nhiên** và **xoá hết** khi xong, nên chạy nhiều lần không bị lẫn dữ liệu. Mỗi test tự tạo user riêng nên không phụ thuộc test khác.
 - Trên production **không chạy** unit hay integration test. Sau khi deploy chỉ chạy smoke test `/api/health`.

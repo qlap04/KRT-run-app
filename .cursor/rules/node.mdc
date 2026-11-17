@@ -7,7 +7,7 @@ alwaysApply: false
 - Create storage clients in one place (`storage.js`): DefaultAzureCredential (or STORAGE_CONNECTION_STRING when set).
 - AuditLog is insert-only (`createEntity`); never update or delete.
 - Hash passwords with bcryptjs; never log passwords, secrets or connection strings.
-- Every new piece of logic gets a `node:test` test: unit tests in `tests/unit/` (pure, no network), integration tests in `web/tests/integration/` (CI only, real storage emulator).
-- Always escape in EJS (`<%= %>`); never use `<%- %>` for user data.
+- Every new piece of logic gets a `node:test` test: unit tests in `tests/unit/` (pure, no network), integration tests in `web/tests/integration/` (CI only, real storage emulator). Integration auth uses JWT Bearer.
+- `web/` is a JSON API only; the React SPA lives in `frontend/`.
 - No hardcoded secrets; read them from `process.env`.
 - All user-facing text, messages, logs, comments and test names are in English.
