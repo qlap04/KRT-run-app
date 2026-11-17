@@ -45,11 +45,15 @@ export async function api(path, { method = 'GET', body, form } = {}) {
     if (!window.location.pathname.startsWith('/login')) {
       window.location.assign('/login');
     }
-    throw new Error(json.error || 'Unauthorized');
+    const err = new Error(json.error || 'Unauthorized');
+    err.status = 401;
+    throw err;
   }
 
   if (!res.ok) {
-    throw new Error(json.error || 'Request failed');
+    const err = new Error(json.error || 'Request failed');
+    err.status = res.status;
+    throw err;
   }
 
   return json;
