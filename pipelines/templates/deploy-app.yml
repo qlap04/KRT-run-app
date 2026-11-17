@@ -35,10 +35,12 @@ stages:
             artifact: $(artifactName)
             displayName: Download artifact
 
-          # --- App secrets (infra Bicep does not set these; it rewrites all
-          # app settings on provision, so this runs on every deploy)
+          # --- App settings owned by the app (infra Bicep does not set them):
+          # secrets, plus ENSURE_STORAGE so the app creates its container, queue
+          # and tables at startup. Provision rewrites all app settings, so this
+          # runs on every deploy.
           - task: AzureCLI@3
-            displayName: App settings (secrets) -> $(webAppName)
+            displayName: App settings -> $(webAppName)
             inputs:
               azureSubscription: ${{ parameters.serviceConnection }}
               scriptType: bash
@@ -49,6 +51,7 @@ stages:
                   --resource-group $(resourceGroup) \
                   --name $(webAppName) \
                   --settings SESSION_SECRET="$SESSION_SECRET" ADMIN_CODE="$ADMIN_CODE" API_KEY="$API_KEY" \
+                    ENSURE_STORAGE=true \
                   --output none
             env:
               SESSION_SECRET: $(SESSION_SECRET)
