@@ -5,6 +5,7 @@ const { fakeReq, fakeRes } = require('../helpers/http');
 const { createApiController } = require('../../src/controllers/apiController');
 const { createAuthController } = require('../../src/controllers/authController');
 const { createAdminController } = require('../../src/controllers/adminController');
+const { createAdminApiController } = require('../../src/controllers/adminApiController');
 
 describe('apiController', () => {
   const denyAuth = (req, res) => res.status(401).json({ error: 'unauthorized' });
@@ -252,5 +253,68 @@ describe('adminController', () => {
     await make({ conflict: true, message: 'm' }).controller.approve(req(), res409, mock.fn());
     assert.equal(res409.statusCode, 409);
     assert.equal(res409.rendered.data.message, 'm');
+  });
+});
+
+describe('adminApiController', () => {
+  const make = ({ runService = {}, auditService = {} } = {}) => (
+    createAdminApiController({ runService, auditService })
+  );
+  const adminReq = (extra = {}) => {
+    const req = fakeReq({
+      params: { month: '2026-11', runId: 'r1' },
+      query: { month: '2026-11', date: '2026-11-17' },
+      body: { note: 'ok' },
+      ...extra,
+    });
+    req.user = { code: 'ADM01', fullName: 'Admin', role: 'admin' };
+    return req;
+  };
+
+  it('reviewList returns pendingReview JSON', async () => {
+    const data = { month: '2026-11', list: [] };
+    const runService = { pendingReview: mock.fn(async () => data) };
+    const res = fakeRes();
+    await make({ runService }).reviewList(adminReq(), res, mock.fn());
+    assert.deepEqual(res.body, data);
+    assert.equal(runService.pendingReview.mock.calls[0].arguments[0], '2026-11');
+  });
+
+  it('auditLog returns listForDate JSON', async () => {
+    const data = { date: '2026-11-17', entries: [] };
+    const auditService = { listForDate: mock.fn(async () => data) };
+    const res = fakeRes();
+    await make({ auditService }).auditLog(adminReq(), res, mock.fn());
+    assert.deepEqual(res.body, data);
+    assert.equal(auditService.listForDate.mock.calls[0].arguments[0], '2026-11-17');
+  });
+
+  it('approve calls review with APPROVED and returns { ok: true }', async () => {
+    const runService = { review: mock.fn(async () => ({ ok: true, month: '2026-11' })) };
+    const res = fakeRes();
+    await make({ runService }).approve(adminReq(), res, mock.fn());
+    assert.deepEqual(res.body, { ok: true });
+    assert.equal(runService.review.mock.calls[0].arguments[0].newStatus, 'APPROVED');
+    assert.equal(runService.review.mock.calls[0].arguments[0].actor, 'ADM01');
+    assert.equal(runService.review.mock.calls[0].arguments[0].note, 'ok');
+  });
+
+  it('reject calls review with REJECTED', async () => {
+    const runService = { review: mock.fn(async () => ({ ok: true, month: '2026-11' })) };
+    await make({ runService }).reject(adminReq(), fakeRes(), mock.fn());
+    assert.equal(runService.review.mock.calls[0].arguments[0].newStatus, 'REJECTED');
+  });
+
+  it('maps notFound to 404 and conflict to 409 JSON', async () => {
+    const res404 = fakeRes();
+    await make({ runService: { review: async () => ({ notFound: true }) } })
+      .approve(adminReq(), res404, mock.fn());
+    assert.equal(res404.statusCode, 404);
+
+    const res409 = fakeRes();
+    await make({ runService: { review: async () => ({ conflict: true, message: 'already reviewed' }) } })
+      .approve(adminReq(), res409, mock.fn());
+    assert.equal(res409.statusCode, 409);
+    assert.deepEqual(res409.body, { error: 'already reviewed' });
   });
 });

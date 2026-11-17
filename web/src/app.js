@@ -7,12 +7,13 @@ const { notFound, errorHandler } = require('./middlewares/errorHandler');
 const { createAuthController } = require('./controllers/authController');
 const { createRunController } = require('./controllers/runController');
 const { createAdminController } = require('./controllers/adminController');
+const { createAdminApiController } = require('./controllers/adminApiController');
 const { createApiController } = require('./controllers/apiController');
 const { createJwt } = require('./middlewares/jwt');
 
 function createApp(deps) {
   const { cfg, authService, runService, auditService } = deps;
-  const { signToken, requireAuth } = createJwt({ cfg });
+  const { signToken, requireAuth, requireAdminApi } = createJwt({ cfg });
   const app = express();
   app.set('view engine', 'ejs');
   app.set('views', path.join(__dirname, 'views'));
@@ -45,9 +46,10 @@ function createApp(deps) {
   const authController = createAuthController({ authService });
   const runController = createRunController({ runService });
   const adminController = createAdminController({ runService, auditService });
+  const adminApiController = createAdminApiController({ runService, auditService });
   const apiController = createApiController({ cfg, runService, authService, signToken, requireAuth });
 
-  app.use(require('./routes/api')({ apiController, requireAuth }));
+  app.use(require('./routes/api')({ apiController, adminApiController, requireAuth, requireAdminApi }));
   app.use(require('./routes/auth')({ authController }));
   app.use(require('./routes/runs')({ runController }));
   app.use(require('./routes/admin')({ adminController }));
