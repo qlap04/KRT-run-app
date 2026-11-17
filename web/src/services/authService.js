@@ -49,7 +49,9 @@ function createAuthService({ cfg, users, audit }) {
           role,
         });
       } catch (e) {
-        if (e.statusCode === 409) return { ok: false, error: 'Employee code is already registered', form };
+        if (e.statusCode === 409) {
+          return { ok: false, statusCode: 409, error: 'Employee code is already registered', form };
+        }
         throw e;
       }
       await audit.append({

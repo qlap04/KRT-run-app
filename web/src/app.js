@@ -8,9 +8,11 @@ const { createAuthController } = require('./controllers/authController');
 const { createRunController } = require('./controllers/runController');
 const { createAdminController } = require('./controllers/adminController');
 const { createApiController } = require('./controllers/apiController');
+const { createJwt } = require('./middlewares/jwt');
 
 function createApp(deps) {
   const { cfg, authService, runService, auditService } = deps;
+  const { signToken, requireAuth } = createJwt({ cfg });
   const app = express();
   app.set('view engine', 'ejs');
   app.set('views', path.join(__dirname, 'views'));
@@ -43,9 +45,9 @@ function createApp(deps) {
   const authController = createAuthController({ authService });
   const runController = createRunController({ runService });
   const adminController = createAdminController({ runService, auditService });
-  const apiController = createApiController({ cfg, runService });
+  const apiController = createApiController({ cfg, runService, authService, signToken });
 
-  app.use(require('./routes/api')({ apiController }));
+  app.use(require('./routes/api')({ apiController, requireAuth }));
   app.use(require('./routes/auth')({ authController }));
   app.use(require('./routes/runs')({ runController }));
   app.use(require('./routes/admin')({ adminController }));

@@ -7,7 +7,11 @@ const { createAuthController } = require('../../src/controllers/authController')
 const { createAdminController } = require('../../src/controllers/adminController');
 
 describe('apiController', () => {
-  const make = (cfg = {}) => createApiController({ cfg: { appEnv: 'dev', apiKey: 'k-123', ...cfg }, runService: {} });
+  const make = (cfg = {}, extras = {}) => createApiController({
+    cfg: { appEnv: 'dev', apiKey: 'k-123', ...cfg },
+    runService: {},
+    ...extras,
+  });
   const run = (controller, req) => {
     const res = fakeRes();
     const next = mock.fn();
@@ -42,6 +46,63 @@ describe('apiController', () => {
   it('apiAuth never accepts an empty key even when API_KEY is not configured', () => {
     const { res } = run(make({ apiKey: '' }), fakeReq({ headers: { 'x-api-key': '' } }));
     assert.equal(res.statusCode, 401);
+  });
+  it('login returns a token and user on success', async () => {
+    const sessionUser = { code: 'F001', fullName: 'Ann', role: 'user' };
+    const authService = {
+      login: mock.fn(async () => ({ ok: true, sessionUser, code: 'F001', clientIp: '203.0.113.7' })),
+      recordLoginSuccess: mock.fn(),
+    };
+    const signToken = mock.fn(() => 'jwt-token');
+    const controller = make({}, { authService, signToken });
+    const res = fakeRes();
+    await controller.login(fakeReq({ body: { employeeCode: 'F001', password: 'Password1' } }), res, mock.fn());
+    assert.deepEqual(res.body, { token: 'jwt-token', user: sessionUser });
+    assert.deepEqual(signToken.mock.calls[0].arguments[0], sessionUser);
+    assert.equal(authService.recordLoginSuccess.mock.callCount(), 1);
+  });
+  it('login answers 401 JSON when credentials are wrong', async () => {
+    const authService = {
+      login: async () => ({ ok: false, error: 'Wrong employee code or password', code: 'F001' }),
+    };
+    const res = fakeRes();
+    await make({}, { authService, signToken: () => '' }).login(fakeReq({ body: {} }), res, mock.fn());
+    assert.equal(res.statusCode, 401);
+    assert.deepEqual(res.body, { error: 'Wrong employee code or password' });
+  });
+  it('register answers 400 JSON for validation errors and 409 for duplicates', async () => {
+    const bad = make({}, {
+      authService: { register: async () => ({ ok: false, error: 'Please enter your full name', form: {} }) },
+    });
+    const res400 = fakeRes();
+    await bad.register(fakeReq({ body: {} }), res400, mock.fn());
+    assert.equal(res400.statusCode, 400);
+    assert.deepEqual(res400.body, { error: 'Please enter your full name' });
+
+    const conflict = make({}, {
+      authService: {
+        register: async () => ({
+          ok: false, statusCode: 409, error: 'Employee code is already registered', form: {},
+        }),
+      },
+    });
+    const res409 = fakeRes();
+    await conflict.register(fakeReq({ body: {} }), res409, mock.fn());
+    assert.equal(res409.statusCode, 409);
+    assert.deepEqual(res409.body, { error: 'Employee code is already registered' });
+  });
+  it('register returns ok on success', async () => {
+    const authService = { register: async () => ({ ok: true }) };
+    const res = fakeRes();
+    await make({}, { authService }).register(fakeReq({ body: {} }), res, mock.fn());
+    assert.deepEqual(res.body, { ok: true });
+  });
+  it('me returns req.user', () => {
+    const res = fakeRes();
+    const req = fakeReq();
+    req.user = { code: 'F001', role: 'user' };
+    make().me(req, res);
+    assert.deepEqual(res.body, { code: 'F001', role: 'user' });
   });
   it('runs passes the query and the auth context to the service and returns JSON', async () => {
     const runService = { apiRuns: mock.fn(async () => ({ month: '2026-11', runs: [] })) };
