@@ -1,5 +1,15 @@
 # Variables shared by every environment. NO secrets here.
 variables:
   nodeVersion: 22.x
-  apiPath: krtrun            # APIM: API path (https://<apim>/krtrun/...)
   artifactName: drop
+  
+  apiPath: krtrun            # APIM: API path (https://<apim>/krtrun/...)
+  projectName: krtrun
+  # Names must match the Bicep in the infra repo: <prefix>-<environment>-<type>.
+
+  # $(environment) comes from <env>.yml and is resolved at runtime.
+  resourceGroup: rg-$(projectName)-$(environment)
+  apimResourceGroup: rg-$(projectName)-$(environment)-apim
+  webAppName: $(projectName)-$(environment)-web
+  functionAppName: $(projectName)-$(environment)-func
+  apimName: $(projectName)-$(environment)-apim
