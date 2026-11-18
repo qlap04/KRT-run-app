@@ -1,5 +1,6 @@
 # KRT-run app deploy (repo: app)
 # develop -> Build (unit + integration tests, package) -> DeployDev (approval on Environment krtrun-dev)
+# Optional: tick deployInfra to run the infra provision (main.bicep, no APIM) before the app deploy.
 name: krtrun-app-deploy-$(Date:yyyyMMdd)$(Rev:.r)
 
 trigger:
@@ -12,6 +13,21 @@ trigger:
     - function/**
     - pipelines/**
 pr: none
+
+parameters:
+- name: deployInfra
+  displayName: Provision infra first (main.bicep, no APIM)
+  type: boolean
+  default: false
+
+# The infra repo owns the Bicep 
+resources:
+  repositories:
+  - repository: infra
+    type: github
+    name: qlap04/KRT-run-infra
+    ref: refs/heads/develop
+    endpoint: github.com_qlap04   # GitHub service connection (Azure Pipelines app)
 
 pool:
   vmImage: ubuntu-latest
@@ -43,9 +59,42 @@ stages:
       parameters:
         nodeVersion: $(nodeVersion)
 
+# Only exists when deployInfra is ticked; runs in parallel with Build.
+- ${{ if eq(parameters.deployInfra, true) }}:
+  - stage: ProvisionInfra
+    displayName: Provision infra DEV
+    dependsOn: []
+    variables:
+    # Infra variables (location, ...) come from the infra repo, so they are not duplicated here.
+    - template: pipelines/variables/common.yml@infra
+    - template: pipelines/variables/dev.yml@infra
+    - group: ${{ variables.projectName }}-${{ variables.environment }}   # per-env group: subscriptionId
+    - name: parametersFile
+      value: bicep/env/dev.bicepparam
+    jobs:
+    - deployment: Provision
+      displayName: Lint, what-if and deploy
+      environment: ${{ variables.projectName }}-${{ variables.environment }}
+      strategy:
+        runOnce:
+          deploy:
+            steps:
+            - checkout: infra
+            - template: pipelines/templates/steps/bicep-deployment.yml@infra
+              parameters:
+                deploymentName: $(projectName)-$(environment)-$(Build.BuildId)
+                serviceConnection: ${{ variables.serviceConnection }}
+                subscriptionId: $(subscriptionId)
+                location: $(location)
+                parametersFile: $(parametersFile)
+
 - stage: DeployDev
   displayName: Deploy DEV
-  dependsOn: Build
+  # Runs after infra when deployInfra is ticked, so the app settings are written last.
+  dependsOn:
+  - Build
+  - ${{ if eq(parameters.deployInfra, true) }}:
+    - ProvisionInfra
   variables:
   # Secrets SESSION_SECRET, ADMIN_CODE, API_KEY (business config owned by the app)
   - group: ${{ variables.projectName }}-${{ variables.environment }}   # per-env group
