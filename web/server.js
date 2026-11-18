@@ -11,7 +11,7 @@ const { createApp } = require('./src/app');
 
 async function main() {
   const cfg = loadConfig();
-  if (cfg.sessionSecretGenerated) console.warn('[warn] SESSION_SECRET is not set: using a random secret (sessions are lost on restart)');
+  if (cfg.sessionSecretGenerated) console.warn('[warn] SESSION_SECRET is not set: using a random secret (JWTs are invalid after restart)');
   const storage = createStorage(cfg);
   if (cfg.ensureStorage) await storage.ensure().catch((e) => { if (e.statusCode !== 409) throw e; });
 

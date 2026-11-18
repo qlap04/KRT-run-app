@@ -1,0 +1,42 @@
+# Steps: integration tests (web) against Azurite (storage emulator).
+# Azurite via docker run (needs --skipApiVersionCheck; service containers cannot override CMD).
+# Call inside a job after checkout.
+parameters:
+- name: nodeVersion
+  type: string
+
+steps:
+- task: UseNode@1
+  displayName: Use Node ${{ parameters.nodeVersion }}
+  inputs:
+    version: ${{ parameters.nodeVersion }}
+
+- script: |
+    docker run -d --name storage-emulator -p 10000-10002:10000-10002 \
+      mcr.microsoft.com/azure-storage/azurite \
+      azurite --skipApiVersionCheck --blobHost 0.0.0.0 --queueHost 0.0.0.0 --tableHost 0.0.0.0
+    for port in 10000 10001 10002; do
+      timeout 30 bash -c "until (echo > /dev/tcp/127.0.0.1/$port) 2>/dev/null; do sleep 1; done" \
+        || { echo "Emulator port $port is not ready"; docker logs storage-emulator; exit 1; }
+    done
+  displayName: Start Azurite
+
+# Config via env only. 
+- script: npm ci && npm run test:integration:ci
+  workingDirectory: web
+  displayName: Install and integration test (web)
+  env:
+    STORAGE_CONNECTION_STRING: UseDevelopmentStorage=true
+    INTEGRATION_REQUIRED: 'true'
+
+- task: PublishTestResults@2
+  displayName: Publish integration results
+  condition: succeededOrFailed()
+  inputs:
+    testResultsFormat: JUnit
+    testResultsFiles: web/test-results/integration.xml
+    testRunTitle: Integration tests
+
+- script: docker rm -f storage-emulator
+  displayName: Stop Azurite
+  condition: always()

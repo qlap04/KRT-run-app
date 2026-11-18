@@ -1,10 +1,5 @@
-# Environment: dev  (only active environment)
-# Resource names must match the Bicep in the infra repo: <prefix>-<resourceEnv>-web / -func / -apim.
+# Environment: dev (only active environment)
 variables:
   environment: dev
-  resourceGroup: rg-krtrun-dev
-  apimResourceGroup: rg-krtrun-dev-apim   # APIM has its own RG (infra main.bicep)
-  webAppName: krtrun-dev-web
-  functionAppName: krtrun-dev-func
-  apimName: krtrun-dev-apim
-  deployApim: 'true'
+  # One service connection per environment (prod gets sc-krtrun-prod in prod.yml)
+  serviceConnection: sc-krtrun-dev

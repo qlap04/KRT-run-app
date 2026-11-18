@@ -1,0 +1,44 @@
+# Steps: unit tests, then package web.zip + function.zip + openapi.yaml
+# into one pipeline artifact. Call inside a job after checkout.
+parameters:
+- name: nodeVersion
+  type: string
+- name: artifactName
+  type: string
+
+steps:
+- task: UseNode@1
+  displayName: Use Node ${{ parameters.nodeVersion }}
+  inputs:
+    version: ${{ parameters.nodeVersion }}
+
+- script: npm ci && npm run test:unit:ci
+  workingDirectory: web
+  displayName: Install and unit test (web)
+
+- script: npm ci && npm run test:unit:ci
+  workingDirectory: function
+  displayName: Install and unit test (function)
+
+- task: PublishTestResults@2
+  displayName: Publish unit results
+  condition: succeededOrFailed()
+  inputs:
+    testResultsFormat: JUnit
+    testResultsFiles: '**/test-results/unit.xml'
+    testRunTitle: Unit tests
+
+# web: no node_modules (App Service builds via SCM_DO_BUILD_DURING_DEPLOYMENT)
+# function: production node_modules only (zip deploy runs as-is)
+- script: |
+    set -e
+    out="$(Build.ArtifactStagingDirectory)"
+    (cd web && zip -qr "$out/web.zip" . -x 'node_modules/*' 'tests/*' 'test-results/*' '.env*')
+    (cd function && rm -rf node_modules && npm ci --omit=dev \
+      && zip -qr "$out/function.zip" . -x 'tests/*' 'test-results/*' 'local.settings*.json' '.env*')
+    cp web/openapi.yaml "$out/"
+  displayName: Package web, function and openapi
+
+- publish: $(Build.ArtifactStagingDirectory)
+  artifact: ${{ parameters.artifactName }}
+  displayName: Publish artifact

@@ -1,0 +1,88 @@
+# Steps: app settings (secrets), web + function deploy, APIM API import, smoke test.
+# Secrets SESSION_SECRET, ADMIN_CODE, API_KEY come from the caller's variable group.
+parameters:
+- name: serviceConnection
+  type: string
+- name: artifactName
+  type: string
+- name: resourceGroup
+  type: string
+- name: apimResourceGroup
+  type: string
+- name: webAppName
+  type: string
+- name: functionAppName
+  type: string
+- name: apimName
+  type: string
+- name: apiPath
+  type: string
+
+steps:
+- download: current
+  artifact: ${{ parameters.artifactName }}
+  displayName: Download artifact
+
+# --- App settings owned by the app
+- task: AzureCLI@3
+  displayName: App settings -> ${{ parameters.webAppName }}
+  inputs:
+    azureSubscription: ${{ parameters.serviceConnection }}
+    scriptType: bash
+    scriptLocation: inlineScript
+    inlineScript: |
+      set -e
+      az webapp config appsettings set \
+        --resource-group ${{ parameters.resourceGroup }} \
+        --name ${{ parameters.webAppName }} \
+        --settings SESSION_SECRET="$SESSION_SECRET" ADMIN_CODE="$ADMIN_CODE" API_KEY="$API_KEY" \
+          ENSURE_STORAGE=true \
+        --output none
+  env:
+    SESSION_SECRET: $(SESSION_SECRET)
+    ADMIN_CODE: $(ADMIN_CODE)
+    API_KEY: $(API_KEY)
+
+# --- Apps
+- task: AzureWebApp@1
+  displayName: Web -> ${{ parameters.webAppName }}
+  inputs:
+    azureSubscription: ${{ parameters.serviceConnection }}
+    appType: webAppLinux
+    appName: ${{ parameters.webAppName }}
+    package: $(Pipeline.Workspace)/${{ parameters.artifactName }}/web.zip
+    runtimeStack: NODE|22-lts
+    startUpCommand: node server.js
+
+- task: AzureFunctionApp@2
+  displayName: Function -> ${{ parameters.functionAppName }}
+  inputs:
+    connectedServiceNameARM: ${{ parameters.serviceConnection }}
+    appType: functionAppLinux
+    appName: ${{ parameters.functionAppName }}
+    package: $(Pipeline.Workspace)/${{ parameters.artifactName }}/function.zip
+    runtimeStack: NODE|22
+
+# --- APIM + smoke
+- task: AzureCLI@3
+  displayName: APIM import ${{ parameters.apimName }}
+  inputs:
+    azureSubscription: ${{ parameters.serviceConnection }}
+    scriptType: bash
+    scriptLocation: inlineScript
+    inlineScript: |
+      az apim api import \
+        --resource-group ${{ parameters.apimResourceGroup }} \
+        --service-name ${{ parameters.apimName }} \
+        --api-id krtrun \
+        --path ${{ parameters.apiPath }} \
+        --display-name "KRT-run API" \
+        --specification-format OpenApi \
+        --specification-path $(Pipeline.Workspace)/${{ parameters.artifactName }}/openapi.yaml \
+        --service-url https://${{ parameters.webAppName }}.azurewebsites.net \
+        --protocols https
+
+- script: |
+    curl --fail --silent --show-error --retry 10 --retry-delay 15 --retry-all-errors \
+      https://${{ parameters.webAppName }}.azurewebsites.net/api/health
+  displayName: Smoke /api/health
