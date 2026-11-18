@@ -6,7 +6,7 @@ Portal where employees of company F submit monthly running proof: Express JSON A
 web/        Express JSON API (openapi.yaml)
 frontend/   React (Vite) SPA; talks to the API via JWT
 function/   Function that processes the upload-jobs queue
-pipelines/  app-deploy.yml, templates/, variables/<env>.yml
+pipelines/  app-deploy.yml, templates/steps/, variables/<env>.yml
 docs/       SETUP_vi.md (Vietnamese setup guide)
 ```
 
