@@ -28,16 +28,29 @@ steps:
     testResultsFiles: '**/test-results/unit.xml'
     testRunTitle: Unit tests
 
-# web: no node_modules (App Service builds via SCM_DO_BUILD_DURING_DEPLOYMENT)
-# function: production node_modules only (zip deploy runs as-is)
+# Package: one zip per app plus the OpenAPI spec, all into one artifact folder.
+# Built-in ArchiveFiles@2 has no exclude list and cannot drop dev dependencies, so zip is used.
+
+# web.zip: source only. App Service runs npm install on deploy (SCM_DO_BUILD_DURING_DEPLOYMENT).
+- script: zip -qr "$(Build.ArtifactStagingDirectory)/web.zip" . -x 'node_modules/*' 'tests/*' 'test-results/*' '.env*'
+  workingDirectory: web
+  displayName: Package web.zip
+
+# function.zip: zip deploy runs as-is, so ship production node_modules (dev dependencies removed).
 - script: |
     set -e
-    out="$(Build.ArtifactStagingDirectory)"
-    (cd web && zip -qr "$out/web.zip" . -x 'node_modules/*' 'tests/*' 'test-results/*' '.env*')
-    (cd function && rm -rf node_modules && npm ci --omit=dev \
-      && zip -qr "$out/function.zip" . -x 'tests/*' 'test-results/*' 'local.settings*.json' '.env*')
-    cp web/openapi.yaml "$out/"
-  displayName: Package web, function and openapi
+    rm -rf node_modules && npm ci --omit=dev
+    zip -qr "$(Build.ArtifactStagingDirectory)/function.zip" . -x 'tests/*' 'test-results/*' 'local.settings*.json' '.env*'
+  workingDirectory: function
+  displayName: Package function.zip
+
+# openapi.yaml: used by the deploy stage to import the API into APIM.
+- task: CopyFiles@2
+  displayName: Copy openapi.yaml
+  inputs:
+    sourceFolder: web
+    contents: openapi.yaml
+    targetFolder: $(Build.ArtifactStagingDirectory)
 
 - publish: $(Build.ArtifactStagingDirectory)
   artifact: ${{ parameters.artifactName }}
