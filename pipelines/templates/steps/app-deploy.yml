@@ -66,7 +66,7 @@ steps:
       az apim api import \
         --resource-group ${{ parameters.apimResourceGroup }} \
         --service-name ${{ parameters.apimName }} \
-        --api-id krtrun \
+        --api-id ${{ parameters.apiPath }} \
         --path ${{ parameters.apiPath }} \
         --display-name "KRT-run API" \
         --specification-format OpenApi \
