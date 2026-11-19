@@ -6,7 +6,7 @@ variables:
   projectName: krtrun
   # Names must match the Bicep in the infra repo: <prefix>-<environment>-<type>.
 
-  # $(environment) comes from <env>.yml and is resolved at runtime.
+  # environment is a per-stage variable (each stage loads its <env>.yml), not a parameter, so one run can promote dev → sit → uat → prod.
   resourceGroup: rg-$(projectName)-$(environment)
   apimResourceGroup: rg-$(projectName)-$(environment)-apim
   webAppName: $(projectName)-$(environment)-web
