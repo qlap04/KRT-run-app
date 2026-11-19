@@ -102,9 +102,15 @@ stages:
               serviceConnection: ${{ variables.serviceConnection }}
               artifactName: $(artifactName)
               resourceGroup: $(resourceGroup)
-              apimResourceGroup: $(apimResourceGroup)
               webAppName: $(webAppName)
               functionAppName: $(functionAppName)
+              appSettings: $(appSettings)
+          # Publish to APIM only after the app is deployed and healthy.
+          - template: templates/steps/apim-publish.yml
+            parameters:
+              serviceConnection: ${{ variables.serviceConnection }}
+              artifactName: $(artifactName)
+              apimResourceGroup: $(apimResourceGroup)
               apimName: $(apimName)
               apiPath: $(projectName)        # APIM path = project name
-              appSettings: $(appSettings)
+              webAppName: $(webAppName)
