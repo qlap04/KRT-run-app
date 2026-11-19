@@ -24,7 +24,7 @@ Luồng nghiệp vụ: Nhân viên upload ảnh + km + ngày chạy → web lưu
 
 | Biến | Ý nghĩa | Ví dụ |
 |---|---|---|
-| `APP_ENV` | Tên môi trường (hiện dùng `dev`; app vẫn nhận sit/uat/preprod/prod để sau này mở rộng) | `dev` |
+| `APP_ENV` | Tên môi trường, lấy từ `pipelines/variables/<env>.yml` mà stage của env đó nạp (hiện chỉ có `dev`). Code app chấp nhận dev/sit/uat/preprod/prod; thêm env mới bằng cách tạo `variables/<env>.yml` và thêm stage Deploy cho env đó, chạy nối tiếp sau env trước | `dev` |
 | `STORAGE_ACCOUNT_NAME` | Tên storage trên Azure (dùng managed identity) | `stkrtrundevab12cd` |
 | `QUEUE_NAME` | Tên queue | `upload-jobs` |
 | `BLOB_CONTAINER` | Tên container duy nhất chứa ảnh. Ảnh mới nằm ở `incoming/`, ảnh đã xử lý nằm ở `processed/` | `proofs` |
