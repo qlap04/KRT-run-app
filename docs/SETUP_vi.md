@@ -130,7 +130,7 @@ Trong pipeline, kết quả test được lưu ở `test-results/*.xml` (JUnit) 
 
 ## 6. Giới hạn hiện tại (nên biết)
 
-- Session lưu trong bộ nhớ (MemoryStore): chỉ ổn với **1 instance**; restart là đăng nhập lại.
+- Đăng nhập dùng JWT (stateless), ký bằng `SESSION_SECRET`; server không lưu session. Nếu không đặt `SESSION_SECRET` (chỉ cho phép ngoài prod), app tạo khoá ngẫu nhiên khi khởi động, nên token cũ mất hiệu lực sau mỗi lần restart.
 - Chưa có giới hạn số lần đăng nhập sai (rate limit).
 - F1 (free) chạy Node.js: ~60 phút CPU/ngày, 1GB RAM, không Always On (request đầu tiên chậm). Nếu app dừng vì hết quota thì nâng plan lên B1 trong repo `infra`.
 - Pipeline chưa được chạy thật trên Azure (chỉ parse YAML); Function chưa chạy qua `func start` thật trong lúc viết.
