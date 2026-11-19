@@ -76,7 +76,7 @@ Tên variable group và Environment không viết cứng mà ghép từ `${{ var
 
 **Toggle `deployInfra`** (Run pipeline → tick *Provision infra first*): thêm stage `ProvisionInfra` chạy song song với Build, gọi step template `pipelines/templates/steps/bicep-deployment.yml` của repo `infra` (khai báo ở `resources.repositories`, GitHub service connection `github.com_qlap04`) để deploy `main.bicep` (network + app, **không** APIM). Biến infra (`location`...) lấy thẳng từ `variables/*.yml` của repo `infra`, không copy sang đây. DeployDev chờ cả Build và ProvisionInfra, nên app settings luôn được ghi sau cùng. Mặc định `false`: push bình thường không chạy Bicep. Khi tick sẽ hỏi approve 2 lần (infra rồi app). Lần đầu ADO có thể hỏi cho phép truy cập repo `infra`: bấm **Permit**.
 
-Approval **không** nằm trong YAML: bạn vào Azure DevOps → Pipelines → Environments → `krtrun-dev` → Approvals and checks, rồi bật Approvals.
+Approval **không** nằm trong YAML; cấu hình trong Azure DevOps → Pipelines → Environments → `krtrun-dev` → Approvals and checks, rồi bật Approvals.
 
 Nhánh tính năng (`feature/<tên>`) cắt từ `develop` và merge lại bằng pull request.
 
@@ -92,7 +92,7 @@ Code đã nằm trên GitHub, nhánh `develop`: [https://github.com/qlap04/KRT-r
 2. **Environments**: chỉ cần `krtrun-dev`; vào Approvals and checks rồi **bật Approvals**.
 3. **Tạo pipeline** (Pipelines → New pipeline → chọn **GitHub (YAML)** → chọn repo `qlap04/KRT-run-app` → *Existing Azure Pipelines YAML file*): `krtrun-app-deploy` → `/pipelines/app-deploy.yml`. Lần đầu Azure DevOps sẽ xin quyền truy cập GitHub.
 4. **Điều kiện trước khi chạy**: APIM của env phải có sẵn (pipeline `provision-apim.yml` bên repo `infra`). Hạ tầng app (web, function, storage) không cần chạy trước: lần đầu tick **deployInfra** khi Run pipeline, pipeline app tự provision bằng template của repo `infra`.
-5. **Chạy**: đẩy hoặc merge vào `develop` → pipeline build + test, deploy web + function, import API vào APIM, smoke test `/api/health`. Stage deploy sẽ chờ bạn Approve trên environment `krtrun-dev`.
+5. **Chạy**: đẩy hoặc merge vào `develop` → pipeline build + test, deploy web + function, import API vào APIM, smoke test `/api/health`. Stage deploy chờ người duyệt Approve trên environment `krtrun-dev`.
 
 Secret (`SESSION_SECRET`, `ADMIN_CODE`, `API_KEY`) là cấu hình nghiệp vụ nên **pipeline app** gắn chúng vào app settings của Web App (bước *App settings* trong `pipelines/templates/steps/app-deploy.yml`). Giá trị không nằm trong repo mà nằm trong variable group `krtrun-dev` (biến secret, bấm khoá). Lần đầu chạy, Azure DevOps sẽ hỏi cho phép pipeline app dùng group này: bấm **Permit**. Pipeline provision bên infra ghi lại toàn bộ app settings, nên sau mỗi lần provision hãy chạy lại pipeline app.
 
@@ -113,7 +113,7 @@ Quy tắc cho dễ nhớ:
 - Mỗi lần chạy, test tạo container, queue, table có **tên ngẫu nhiên** và **xoá hết** khi xong, nên chạy nhiều lần không bị lẫn dữ liệu. Mỗi test tự tạo user riêng nên không phụ thuộc test khác.
 - Trên production **không chạy** unit hay integration test. Sau khi deploy chỉ chạy smoke test `/api/health`.
 
-Chạy integration test trên máy bạn (cần Docker):
+Chạy integration test ở máy local (cần Docker):
 
 ```bash
 docker run -d --name storage-emulator -p 10000-10002:10000-10002 \
