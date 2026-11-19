@@ -116,3 +116,4 @@ stages:
               functionAppName: $(functionAppName)
               apimName: $(apimName)
               apiPath: $(apiPath)
+              appSettings: $(appSettings)

@@ -13,3 +13,12 @@ variables:
   webAppName: $(projectName)-$(environment)-web
   functionAppName: $(projectName)-$(environment)-func
   apimName: $(projectName)-$(environment)-apim
+
+  # Web app settings owned by the app (AzureAppServiceSettings@1). Secrets: per-env variable group.
+  appSettings: |
+    [
+      { "name": "SESSION_SECRET", "value": "$(SESSION_SECRET)", "slotSetting": false },
+      { "name": "ADMIN_CODE",     "value": "$(ADMIN_CODE)",     "slotSetting": false },
+      { "name": "API_KEY",        "value": "$(API_KEY)",        "slotSetting": false },
+      { "name": "ENSURE_STORAGE", "value": "true",              "slotSetting": false }
+    ]
