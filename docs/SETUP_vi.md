@@ -88,10 +88,10 @@ Nhánh tính năng (`feature/<tên>`) cắt từ `develop` và merge lại bằn
 
 Code đã nằm trên GitHub, nhánh `develop`: [https://github.com/qlap04/KRT-run-app](https://github.com/qlap04/KRT-run-app). Không cần tạo repo Azure Repos hay push lại.
 
-1. **Service connection** (Project settings → Service connections → *Azure Resource Manager* → **Workload identity federation**): tạo `sc-krtrun-dev`. Tên phải khớp `serviceConnection` trong `pipelines/variables/dev.yml`. Có thể dùng chung với repo `infra` nếu cùng project; cần quyền deploy web app / function app / APIM (Contributor trên resource group là đủ).
+1. **Service connection** (Project settings → Service connections → *Azure Resource Manager* → **Workload identity federation**): tạo `sc-krtrun-dev`. Giá trị `serviceConnection` trong `pipelines/variables/dev.yml` phải khớp đúng tên service connection này trong ADO. Có thể dùng chung với repo `infra` nếu cùng project; cần quyền deploy web app / function app / APIM (Contributor trên resource group là đủ).
 2. **Environments**: chỉ cần `krtrun-dev`; vào Approvals and checks rồi **bật Approvals**.
 3. **Tạo pipeline** (Pipelines → New pipeline → chọn **GitHub (YAML)** → chọn repo `qlap04/KRT-run-app` → *Existing Azure Pipelines YAML file*): `krtrun-app-deploy` → `/pipelines/app-deploy.yml`. Lần đầu Azure DevOps sẽ xin quyền truy cập GitHub.
-4. **Điều kiện trước khi chạy**: repo `infra` đã chạy `provision.yml` **và** `provision-apim.yml` cho **dev** (thiếu web app hoặc APIM thì deploy sẽ lỗi).
+4. **Điều kiện trước khi chạy**: APIM của env phải có sẵn (pipeline `provision-apim.yml` bên repo `infra`). Hạ tầng app (web, function, storage) không cần chạy trước: lần đầu tick **deployInfra** khi Run pipeline, pipeline app tự provision bằng template của repo `infra`.
 5. **Chạy**: đẩy hoặc merge vào `develop` → pipeline build + test, deploy web + function, import API vào APIM, smoke test `/api/health`. Stage deploy sẽ chờ bạn Approve trên environment `krtrun-dev`.
 
 Secret (`SESSION_SECRET`, `ADMIN_CODE`, `API_KEY`) là cấu hình nghiệp vụ nên **pipeline app** gắn chúng vào app settings của Web App (bước *App settings* trong `pipelines/templates/steps/app-deploy.yml`). Giá trị không nằm trong repo mà nằm trong variable group `krtrun-dev` (biến secret, bấm khoá). Lần đầu chạy, Azure DevOps sẽ hỏi cho phép pipeline app dùng group này: bấm **Permit**. Pipeline provision bên infra ghi lại toàn bộ app settings, nên sau mỗi lần provision hãy chạy lại pipeline app.
