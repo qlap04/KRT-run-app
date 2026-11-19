@@ -106,5 +106,5 @@ stages:
               webAppName: $(webAppName)
               functionAppName: $(functionAppName)
               apimName: $(apimName)
-              apiPath: $(apiPath)
+              apiPath: $(projectName)        # APIM path = project name
               appSettings: $(appSettings)

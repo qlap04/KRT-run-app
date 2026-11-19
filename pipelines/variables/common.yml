@@ -3,7 +3,6 @@ variables:
   nodeVersion: 22.x
   artifactName: drop
   
-  apiPath: krtrun            # APIM: API path (https://<apim>/krtrun/...)
   projectName: krtrun
   # Names must match the Bicep in the infra repo: <prefix>-<environment>-<type>.
 
