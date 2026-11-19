@@ -1,5 +1,6 @@
-# Steps: unit tests, then package web.zip + function.zip + openapi.yaml
-# into one pipeline artifact. Call inside a job after checkout.
+# Steps: build once, test that build, publish only if every test passed.
+# checkout -> install -> unit tests -> integration tests (Azurite) -> package -> publish.
+# Runs the whole job by itself (checks out the repo itself).
 parameters:
 - name: nodeVersion
   type: string
@@ -7,6 +8,8 @@ parameters:
   type: string
 
 steps:
+- checkout: self
+
 - task: UseNode@1
   displayName: Use Node ${{ parameters.nodeVersion }}
   inputs:
@@ -20,25 +23,43 @@ steps:
   workingDirectory: function
   displayName: Install and unit test (function)
 
+# Integration tests reuse the web install above (same node_modules, no second npm ci).
+- template: node-integration-test.yml
+
+# One publish for unit + integration results; always() keeps results even on failure or cancel.
 - task: PublishTestResults@2
-  displayName: Publish unit results
-  condition: succeededOrFailed()
+  displayName: Publish test results
+  condition: always()
   inputs:
     testResultsFormat: JUnit
-    testResultsFiles: '**/test-results/unit.xml'
-    testRunTitle: Unit tests
+    testResultsFiles: '**/test-results/*.xml'
+    testRunTitle: Unit and integration tests
 
-# web: no node_modules (App Service builds via SCM_DO_BUILD_DURING_DEPLOYMENT)
-# function: production node_modules only (zip deploy runs as-is)
+# Package: one zip per app plus the OpenAPI spec, all into one artifact folder.
+# Built-in ArchiveFiles@2 has no exclude list and cannot drop dev dependencies, so zip is used.
+
+# web.zip: source only. App Service runs npm install on deploy (SCM_DO_BUILD_DURING_DEPLOYMENT).
+- script: zip -qr "$(Build.ArtifactStagingDirectory)/web.zip" . -x 'node_modules/*' 'tests/*' 'test-results/*' '.env*'
+  workingDirectory: web
+  displayName: Package web.zip
+
+# function.zip: zip deploy runs as-is, so ship production node_modules (dev dependencies removed).
 - script: |
     set -e
-    out="$(Build.ArtifactStagingDirectory)"
-    (cd web && zip -qr "$out/web.zip" . -x 'node_modules/*' 'tests/*' 'test-results/*' '.env*')
-    (cd function && rm -rf node_modules && npm ci --omit=dev \
-      && zip -qr "$out/function.zip" . -x 'tests/*' 'test-results/*' 'local.settings*.json' '.env*')
-    cp web/openapi.yaml "$out/"
-  displayName: Package web, function and openapi
+    rm -rf node_modules && npm ci --omit=dev
+    zip -qr "$(Build.ArtifactStagingDirectory)/function.zip" . -x 'tests/*' 'test-results/*' 'local.settings*.json' '.env*'
+  workingDirectory: function
+  displayName: Package function.zip
 
+# openapi.yaml: used by the deploy stage to import the API into APIM.
+- task: CopyFiles@2
+  displayName: Copy openapi.yaml
+  inputs:
+    sourceFolder: web
+    contents: openapi.yaml
+    targetFolder: $(Build.ArtifactStagingDirectory)
+
+# Reached only when every step above succeeded, so a failed build is never published.
 - publish: $(Build.ArtifactStagingDirectory)
   artifact: ${{ parameters.artifactName }}
   displayName: Publish artifact

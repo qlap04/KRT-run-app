@@ -17,31 +17,23 @@ parameters:
   type: string
 - name: apiPath
   type: string
+- name: appSettings
+  type: string
 
 steps:
 - download: current
   artifact: ${{ parameters.artifactName }}
   displayName: Download artifact
 
-# --- App settings owned by the app
-- task: AzureCLI@3
+# --- App settings owned by the app (JSON list in variables/common.yml: appSettings)
+# Secret values are macros from the caller's variable group, resolved at runtime.
+- task: AzureAppServiceSettings@1
   displayName: App settings -> ${{ parameters.webAppName }}
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
-    scriptType: bash
-    scriptLocation: inlineScript
-    inlineScript: |
-      set -e
-      az webapp config appsettings set \
-        --resource-group ${{ parameters.resourceGroup }} \
-        --name ${{ parameters.webAppName }} \
-        --settings SESSION_SECRET="$SESSION_SECRET" ADMIN_CODE="$ADMIN_CODE" API_KEY="$API_KEY" \
-          ENSURE_STORAGE=true \
-        --output none
-  env:
-    SESSION_SECRET: $(SESSION_SECRET)
-    ADMIN_CODE: $(ADMIN_CODE)
-    API_KEY: $(API_KEY)
+    appName: ${{ parameters.webAppName }}
+    resourceGroupName: ${{ parameters.resourceGroup }}
+    appSettings: ${{ parameters.appSettings }}
 
 # --- Apps
 - task: AzureWebApp@1
@@ -74,7 +66,7 @@ steps:
       az apim api import \
         --resource-group ${{ parameters.apimResourceGroup }} \
         --service-name ${{ parameters.apimName }} \
-        --api-id krtrun \
+        --api-id ${{ parameters.apiPath }} \
         --path ${{ parameters.apiPath }} \
         --display-name "KRT-run API" \
         --specification-format OpenApi \

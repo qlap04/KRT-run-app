@@ -1,5 +1,5 @@
 # KRT-run app deploy (repo: app)
-# develop -> Build (unit + integration tests, package) -> DeployDev (approval on Environment krtrun-dev)
+# develop -> Build (one job: unit + integration tests on the same build, package) -> DeployDev (approval on Environment krtrun-dev)
 # Optional: tick deployInfra to run the infra provision (main.bicep, no APIM) before the app deploy.
 name: krtrun-app-deploy-$(Date:yyyyMMdd)$(Rev:.r)
 
@@ -41,23 +41,14 @@ stages:
 - stage: Build
   displayName: Build
   jobs:
+  # One job: build once, unit + integration test that build, then publish it.
   - job: Build
-    displayName: Unit test and package
+    displayName: Build, test and package
     steps:
-    - checkout: self
     - template: templates/steps/node-build.yml
       parameters:
         nodeVersion: $(nodeVersion)
         artifactName: $(artifactName)
-
-  # Parallel with Build; a failure stops the deploy.
-  - job: IntegrationTest
-    displayName: Integration test
-    steps:
-    - checkout: self
-    - template: templates/steps/node-integration-test.yml
-      parameters:
-        nodeVersion: $(nodeVersion)
 
 # Only exists when deployInfra is ticked; runs in parallel with Build.
 - ${{ if eq(parameters.deployInfra, true) }}:
@@ -115,4 +106,5 @@ stages:
               webAppName: $(webAppName)
               functionAppName: $(functionAppName)
               apimName: $(apimName)
-              apiPath: $(apiPath)
+              apiPath: $(projectName)        # APIM path = project name
+              appSettings: $(appSettings)

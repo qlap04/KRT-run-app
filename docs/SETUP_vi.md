@@ -24,7 +24,7 @@ Luồng nghiệp vụ: Nhân viên upload ảnh + km + ngày chạy → web lưu
 
 | Biến | Ý nghĩa | Ví dụ |
 |---|---|---|
-| `APP_ENV` | Tên môi trường (hiện dùng `dev`; app vẫn nhận sit/uat/preprod/prod để sau này mở rộng) | `dev` |
+| `APP_ENV` | Tên môi trường, lấy từ `pipelines/variables/<env>.yml` mà stage của env đó nạp (hiện chỉ có `dev`). Code app chấp nhận dev/sit/uat/preprod/prod; thêm env mới bằng cách tạo `variables/<env>.yml` và thêm stage Deploy cho env đó, chạy nối tiếp sau env trước | `dev` |
 | `STORAGE_ACCOUNT_NAME` | Tên storage trên Azure (dùng managed identity) | `stkrtrundevab12cd` |
 | `QUEUE_NAME` | Tên queue | `upload-jobs` |
 | `BLOB_CONTAINER` | Tên container duy nhất chứa ảnh. Ảnh mới nằm ở `incoming/`, ảnh đã xử lý nằm ở `processed/` | `proofs` |
@@ -71,7 +71,7 @@ flowchart TD
 |---|---|---|
 | `develop` | Build → **DEV** | Environment `krtrun-dev` |
 
-Hiện chỉ môi trường **dev** đang dùng. Pipeline `pipelines/app-deploy.yml` của repo này theo quy tắc trên (pipeline provision ở repo `infra` cũng vậy). Build chỉ chạy **một lần**, stage deploy dùng lại artifact. Stage và job khai báo ngay trong `app-deploy.yml`; phần việc nằm ở 3 **step template** trong `pipelines/templates/steps/`: `node-build.yml` (unit test + đóng gói), `node-integration-test.yml` (test với Azurite, chạy song song), `app-deploy.yml` (app settings, deploy web + function, import API vào APIM, smoke test). Một pool `ubuntu-latest`. Service connection đặt riêng cho từng môi trường trong `variables/<env>.yml`, đọc bằng `${{ variables.serviceConnection }}`.
+Hiện chỉ môi trường **dev** đang dùng. Pipeline `pipelines/app-deploy.yml` của repo này theo quy tắc trên (pipeline provision ở repo `infra` cũng vậy). Build chỉ chạy **một lần**, stage deploy dùng lại artifact. Stage và job khai báo ngay trong `app-deploy.yml`; phần việc nằm ở 3 **step template** trong `pipelines/templates/steps/`: `node-build.yml` (một job: cài một lần, unit test, integration test trên đúng bản đó, đóng gói, chỉ publish artifact khi mọi test pass), `node-integration-test.yml` (test với Azurite, được `node-build.yml` gọi), `app-deploy.yml` (app settings, deploy web + function, import API vào APIM, smoke test). Một pool `ubuntu-latest`. Service connection đặt riêng cho từng môi trường trong `variables/<env>.yml`, đọc bằng `${{ variables.serviceConnection }}`.
 Tên variable group và Environment không viết cứng mà ghép từ `${{ variables.projectName }}-${{ variables.environment }}` (dev ra `krtrun-dev`), nên mỗi môi trường có secret và approval riêng.
 
 **Toggle `deployInfra`** (Run pipeline → tick *Provision infra first*): thêm stage `ProvisionInfra` chạy song song với Build, gọi step template `pipelines/templates/steps/bicep-deployment.yml` của repo `infra` (khai báo ở `resources.repositories`, GitHub service connection `github.com_qlap04`) để deploy `main.bicep` (network + app, **không** APIM). Biến infra (`location`...) lấy thẳng từ `variables/*.yml` của repo `infra`, không copy sang đây. DeployDev chờ cả Build và ProvisionInfra, nên app settings luôn được ghi sau cùng. Mặc định `false`: push bình thường không chạy Bicep. Khi tick sẽ hỏi approve 2 lần (infra rồi app). Lần đầu ADO có thể hỏi cho phép truy cập repo `infra`: bấm **Permit**.
@@ -88,10 +88,10 @@ Nhánh tính năng (`feature/<tên>`) cắt từ `develop` và merge lại bằn
 
 Code đã nằm trên GitHub, nhánh `develop`: [https://github.com/qlap04/KRT-run-app](https://github.com/qlap04/KRT-run-app). Không cần tạo repo Azure Repos hay push lại.
 
-1. **Service connection** (Project settings → Service connections → *Azure Resource Manager* → **Workload identity federation**): tạo `sc-krtrun-dev`. Tên phải khớp `serviceConnection` trong `pipelines/variables/dev.yml`. Có thể dùng chung với repo `infra` nếu cùng project; cần quyền deploy web app / function app / APIM (Contributor trên resource group là đủ).
+1. **Service connection** (Project settings → Service connections → *Azure Resource Manager* → **Workload identity federation**): tạo `sc-krtrun-dev`. Giá trị `serviceConnection` trong `pipelines/variables/dev.yml` phải khớp đúng tên service connection này trong ADO. Có thể dùng chung với repo `infra` nếu cùng project; cần quyền deploy web app / function app / APIM (Contributor trên resource group là đủ).
 2. **Environments**: chỉ cần `krtrun-dev`; vào Approvals and checks rồi **bật Approvals**.
 3. **Tạo pipeline** (Pipelines → New pipeline → chọn **GitHub (YAML)** → chọn repo `qlap04/KRT-run-app` → *Existing Azure Pipelines YAML file*): `krtrun-app-deploy` → `/pipelines/app-deploy.yml`. Lần đầu Azure DevOps sẽ xin quyền truy cập GitHub.
-4. **Điều kiện trước khi chạy**: repo `infra` đã chạy `provision.yml` **và** `provision-apim.yml` cho **dev** (thiếu web app hoặc APIM thì deploy sẽ lỗi).
+4. **Điều kiện trước khi chạy**: APIM của env phải có sẵn (pipeline `provision-apim.yml` bên repo `infra`). Hạ tầng app (web, function, storage) không cần chạy trước: lần đầu tick **deployInfra** khi Run pipeline, pipeline app tự provision bằng template của repo `infra`.
 5. **Chạy**: đẩy hoặc merge vào `develop` → pipeline build + test, deploy web + function, import API vào APIM, smoke test `/api/health`. Stage deploy sẽ chờ bạn Approve trên environment `krtrun-dev`.
 
 Secret (`SESSION_SECRET`, `ADMIN_CODE`, `API_KEY`) là cấu hình nghiệp vụ nên **pipeline app** gắn chúng vào app settings của Web App (bước *App settings* trong `pipelines/templates/steps/app-deploy.yml`). Giá trị không nằm trong repo mà nằm trong variable group `krtrun-dev` (biến secret, bấm khoá). Lần đầu chạy, Azure DevOps sẽ hỏi cho phép pipeline app dùng group này: bấm **Permit**. Pipeline provision bên infra ghi lại toàn bộ app settings, nên sau mỗi lần provision hãy chạy lại pipeline app.

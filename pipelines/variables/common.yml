@@ -3,13 +3,21 @@ variables:
   nodeVersion: 22.x
   artifactName: drop
   
-  apiPath: krtrun            # APIM: API path (https://<apim>/krtrun/...)
   projectName: krtrun
   # Names must match the Bicep in the infra repo: <prefix>-<environment>-<type>.
 
-  # $(environment) comes from <env>.yml and is resolved at runtime.
+  # environment is a per-stage variable (each stage loads its <env>.yml), not a parameter, so one run can promote dev → sit → uat → prod.
   resourceGroup: rg-$(projectName)-$(environment)
   apimResourceGroup: rg-$(projectName)-$(environment)-apim
   webAppName: $(projectName)-$(environment)-web
   functionAppName: $(projectName)-$(environment)-func
   apimName: $(projectName)-$(environment)-apim
+
+  # Web app settings owned by the app (AzureAppServiceSettings@1). Secrets: per-env variable group.
+  appSettings: |
+    [
+      { "name": "SESSION_SECRET", "value": "$(SESSION_SECRET)", "slotSetting": false },
+      { "name": "ADMIN_CODE",     "value": "$(ADMIN_CODE)",     "slotSetting": false },
+      { "name": "API_KEY",        "value": "$(API_KEY)",        "slotSetting": false },
+      { "name": "ENSURE_STORAGE", "value": "true",              "slotSetting": false }
+    ]
