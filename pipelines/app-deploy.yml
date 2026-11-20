@@ -50,7 +50,11 @@ stages:
         nodeVersion: $(nodeVersion)
         artifactName: $(artifactName)
 
-# Only exists when deployInfra is ticked; runs in parallel with Build.
+# Separate stage from DeployDev because:
+# - it is inserted only when deployInfra is ticked (compile-time ${{ if }});
+# - dependsOn: [] runs it in parallel with Build, while DeployDev waits for the artifact;
+# - infra variables (from the infra repo) stay out of the app's variable scope;
+# - a Bicep failure is isolated and can be rerun without redeploying the app.
 - ${{ if eq(parameters.deployInfra, true) }}:
   - stage: ProvisionInfra
     displayName: Provision infra DEV
