@@ -46,6 +46,7 @@ function loadConfig(env = process.env) {
     sessionSecretGenerated,
     adminCode: env.ADMIN_CODE || '',
     apiKey: env.API_KEY || '',
+    gatewaySecret: env.GATEWAY_SECRET || '',
     ensureStorage: Boolean(connectionString) || env.ENSURE_STORAGE === 'true',
   };
 }

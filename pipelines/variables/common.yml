@@ -19,5 +19,6 @@ variables:
       { "name": "SESSION_SECRET", "value": "$(SESSION_SECRET)", "slotSetting": false },
       { "name": "ADMIN_CODE",     "value": "$(ADMIN_CODE)",     "slotSetting": false },
       { "name": "API_KEY",        "value": "$(API_KEY)",        "slotSetting": false },
+      { "name": "GATEWAY_SECRET", "value": "$(GATEWAY_SECRET)", "slotSetting": false },
       { "name": "ENSURE_STORAGE", "value": "true",              "slotSetting": false }
     ]

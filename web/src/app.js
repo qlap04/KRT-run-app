@@ -4,6 +4,7 @@ const { notFound, errorHandler } = require('./middlewares/errorHandler');
 const { createAdminApiController } = require('./controllers/adminApiController');
 const { createApiController } = require('./controllers/apiController');
 const { createJwt } = require('./middlewares/jwt');
+const { requireGateway } = require('./middlewares/gateway');
 
 function createApp(deps) {
   const { cfg, authService, runService, auditService } = deps;
@@ -18,6 +19,9 @@ function createApp(deps) {
     res.setHeader('Referrer-Policy', 'same-origin');
     next();
   });
+
+  // Unset (local dev) = no check; set in Azure = only APIM can call the API.
+  if (cfg.gatewaySecret) app.use(requireGateway(cfg.gatewaySecret));
 
   const adminApiController = createAdminApiController({ runService, auditService });
   const apiController = createApiController({ cfg, runService, authService, signToken, requireAuth });

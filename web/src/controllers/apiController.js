@@ -1,11 +1,6 @@
 'use strict';
-const crypto = require('node:crypto');
 const { clientIp } = require('../middlewares/auth');
-
-function safeEqual(a, b) {
-  const x = Buffer.from(String(a)); const y = Buffer.from(String(b));
-  return x.length === y.length && crypto.timingSafeEqual(x, y);
-}
+const { safeEqual } = require('../middlewares/gateway');
 
 function createApiController({ cfg, runService, authService, signToken, requireAuth }) {
   function apiAuth(req, res, next) {
