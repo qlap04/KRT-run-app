@@ -1,4 +1,5 @@
-# Steps: app settings (secrets), web + function deploy, APIM API import, smoke test.
+# Steps: app settings (secrets), web + function deploy, smoke test.
+# Publishing the API to APIM is a separate template (apim-publish.yml).
 # Secrets SESSION_SECRET, ADMIN_CODE, API_KEY come from the caller's variable group.
 parameters:
 - name: serviceConnection
@@ -7,15 +8,9 @@ parameters:
   type: string
 - name: resourceGroup
   type: string
-- name: apimResourceGroup
-  type: string
 - name: webAppName
   type: string
 - name: functionAppName
-  type: string
-- name: apimName
-  type: string
-- name: apiPath
   type: string
 - name: appSettings
   type: string
@@ -55,25 +50,7 @@ steps:
     package: $(Pipeline.Workspace)/${{ parameters.artifactName }}/function.zip
     runtimeStack: NODE|22
 
-# --- APIM + smoke
-- task: AzureCLI@3
-  displayName: APIM import ${{ parameters.apimName }}
-  inputs:
-    azureSubscription: ${{ parameters.serviceConnection }}
-    scriptType: bash
-    scriptLocation: inlineScript
-    inlineScript: |
-      az apim api import \
-        --resource-group ${{ parameters.apimResourceGroup }} \
-        --service-name ${{ parameters.apimName }} \
-        --api-id ${{ parameters.apiPath }} \
-        --path ${{ parameters.apiPath }} \
-        --display-name "KRT-run API" \
-        --specification-format OpenApi \
-        --specification-path $(Pipeline.Workspace)/${{ parameters.artifactName }}/openapi.yaml \
-        --service-url https://${{ parameters.webAppName }}.azurewebsites.net \
-        --protocols https
-
+# --- Smoke
 - script: |
     curl --fail --silent --show-error --retry 10 --retry-delay 15 --retry-all-errors \
       https://${{ parameters.webAppName }}.azurewebsites.net/api/health

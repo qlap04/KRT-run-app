@@ -36,6 +36,8 @@ pool:
 variables:
 - template: variables/common.yml
 - template: variables/dev.yml
+- name: envName   # krtrun-dev: variable group name = ADO Environment name
+  value: ${{ variables.projectName }}-${{ variables.environment }}
 
 stages:
 - stage: Build
@@ -50,7 +52,11 @@ stages:
         nodeVersion: $(nodeVersion)
         artifactName: $(artifactName)
 
-# Only exists when deployInfra is ticked; runs in parallel with Build.
+# Separate stage from DeployDev because:
+# - it is inserted only when deployInfra is ticked (compile-time ${{ if }});
+# - dependsOn: [] runs it in parallel with Build, while DeployDev waits for the artifact;
+# - infra variables (from the infra repo) stay out of the app's variable scope;
+# - a Bicep failure is isolated and can be rerun without redeploying the app.
 - ${{ if eq(parameters.deployInfra, true) }}:
   - stage: ProvisionInfra
     displayName: Provision infra DEV
@@ -59,13 +65,13 @@ stages:
     # Infra variables (location, ...) come from the infra repo, so they are not duplicated here.
     - template: pipelines/variables/common.yml@infra
     - template: pipelines/variables/dev.yml@infra
-    - group: ${{ variables.projectName }}-${{ variables.environment }}   # per-env group: subscriptionId
+    - group: ${{ variables.envName }}   # per-env group: subscriptionId
     - name: parametersFile
       value: bicep/env/dev.bicepparam
     jobs:
     - deployment: Provision
       displayName: Lint, what-if and deploy
-      environment: ${{ variables.projectName }}-${{ variables.environment }}
+      environment: ${{ variables.envName }}
       strategy:
         runOnce:
           deploy:
@@ -88,11 +94,11 @@ stages:
     - ProvisionInfra
   variables:
   # Secrets SESSION_SECRET, ADMIN_CODE, API_KEY (business config owned by the app)
-  - group: ${{ variables.projectName }}-${{ variables.environment }}   # per-env group
+  - group: ${{ variables.envName }}   # per-env group
   jobs:
   - deployment: Deploy
     displayName: Deploy app
-    environment: ${{ variables.projectName }}-${{ variables.environment }}
+    environment: ${{ variables.envName }}
     strategy:
       runOnce:
         deploy:
@@ -102,9 +108,15 @@ stages:
               serviceConnection: ${{ variables.serviceConnection }}
               artifactName: $(artifactName)
               resourceGroup: $(resourceGroup)
-              apimResourceGroup: $(apimResourceGroup)
               webAppName: $(webAppName)
               functionAppName: $(functionAppName)
+              appSettings: $(appSettings)
+          # Publish to APIM only after the app is deployed and healthy.
+          - template: templates/steps/apim-publish.yml
+            parameters:
+              serviceConnection: ${{ variables.serviceConnection }}
+              artifactName: $(artifactName)
+              apimResourceGroup: $(apimResourceGroup)
               apimName: $(apimName)
               apiPath: $(projectName)        # APIM path = project name
-              appSettings: $(appSettings)
+              webAppName: $(webAppName)

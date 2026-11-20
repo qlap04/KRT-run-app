@@ -1,0 +1,36 @@
+# Steps: publish the API (openapi.yaml from the artifact) to an existing APIM.
+# Separate from app-deploy.yml: the app runs without APIM; APIM itself is created by the infra repo.
+# CLI because no built-in ADO task imports an OpenAPI spec into APIM.
+parameters:
+- name: serviceConnection
+  type: string
+- name: artifactName
+  type: string
+- name: apimResourceGroup
+  type: string
+- name: apimName
+  type: string
+- name: apiPath
+  type: string
+- name: webAppName       # backend URL APIM forwards to
+  type: string
+
+steps:
+- task: AzureCLI@3
+  displayName: APIM import ${{ parameters.apimName }}
+  inputs:
+    azureSubscription: ${{ parameters.serviceConnection }}
+    scriptType: bash
+    scriptLocation: inlineScript
+    inlineScript: |
+      az apim api import \
+        --resource-group ${{ parameters.apimResourceGroup }} \
+        --service-name ${{ parameters.apimName }} \
+        --api-id ${{ parameters.apiPath }} \
+        --path ${{ parameters.apiPath }} \
+        --display-name "KRT-run API" \
+        --specification-format OpenApi \
+        --specification-path $(Pipeline.Workspace)/${{ parameters.artifactName }}/openapi.yaml \
+        --service-url https://${{ parameters.webAppName }}.azurewebsites.net \
+        --protocols https
+
