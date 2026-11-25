@@ -109,6 +109,7 @@ stages:
                   prefix: $(projectName)
                   environment: $(environment)
                   location: $(location)
+                  customDomain: $(customDomain)
 
 - stage: DeployDev
   displayName: Deploy DEV
