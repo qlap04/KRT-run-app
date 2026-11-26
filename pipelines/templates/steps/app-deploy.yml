@@ -1,6 +1,6 @@
 # Steps: app settings (secrets), web + function deploy, smoke test.
 # Publishing the API to APIM is a separate template (apim-publish.yml).
-# Secrets SESSION_SECRET, ADMIN_CODE, API_KEY come from the caller's variable group.
+# Secrets are not handled here: the infra app stack sets them as Key Vault references.
 parameters:
 - name: serviceConnection
   type: string
@@ -21,7 +21,6 @@ steps:
   displayName: Download artifact
 
 # --- App settings owned by the app (JSON list in variables/common.yml: appSettings)
-# Secret values are macros from the caller's variable group, resolved at runtime.
 - task: AzureAppServiceSettings@1
   displayName: App settings -> ${{ parameters.webAppName }}
   inputs:

@@ -137,7 +137,7 @@ stages:
   - ${{ if eq(parameters.deployInfra, true) }}:
     - ProvisionInfra
   variables:
-  # Secrets SESSION_SECRET, ADMIN_CODE, API_KEY (business config owned by the app)
+  # Per-env group. The app secrets are no longer read here: they live in Key Vault.
   - group: ${{ variables.envName }}   # per-env group
   jobs:
   - deployment: Deploy
