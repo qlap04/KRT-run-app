@@ -1,6 +1,6 @@
 # KRT-run app deploy (repo: app)
 # develop -> Build (one job: unit + integration tests on the same build, package) -> DeployDev (approval on Environment krtrun-dev)
-# Optional: tick deployInfra to run the infra provision (network, data and app stacks, no APIM) before the app deploy.
+# Optional: tick deployInfra to run the infra provision (secret, network, data and app stacks, no APIM) before the app deploy.
 name: krtrun-app-deploy-$(Date:yyyyMMdd)$(Rev:.r)
 
 trigger:
@@ -16,7 +16,7 @@ pr: none
 
 parameters:
 - name: deployInfra
-  displayName: Provision infra first (network, data and app stacks, no APIM)
+  displayName: Provision infra first (secret, network, data and app stacks, no APIM)
   type: boolean
   default: false
 
@@ -65,7 +65,7 @@ stages:
     # Infra variables (location, ...) come from the infra repo, so they are not duplicated here.
     - template: pipelines/variables/common.yml@infra
     - template: pipelines/variables/dev.yml@infra
-    - group: ${{ variables.envName }}   # per-env group: subscriptionId
+    - group: ${{ variables.envName }}   # per-env group: subscriptionId, officerPrincipalId
     jobs:
     - deployment: Provision
       displayName: Lint, what-if and deploy
@@ -75,9 +75,25 @@ stages:
           deploy:
             steps:
             - checkout: infra
-            # Stack order network, data, app: each stack builds the ids of the previous ones from the same names.
+            # Stack order secret, network, data, app: each stack builds the names and ids of the previous ones.
+            # Secret first: the app stack references its Key Vault. The vault resource group is
+            # decided in infra (secretResourceGroupName() in naming.bicep), not hardcoded here.
             - template: pipelines/templates/steps/bicep-deployment.yml@infra
               parameters:
+                stepLabel: Secret
+                deploymentName: $(projectName)-$(environment)-secret-$(Build.BuildId)
+                templateFile: bicep/stacks/00-secret/main.bicep
+                serviceConnection: ${{ variables.serviceConnection }}
+                subscriptionId: $(subscriptionId)
+                location: $(location)
+                parameters:
+                  prefix: $(projectName)
+                  environment: $(environment)
+                  location: $(location)
+                  officerPrincipalId: $(officerPrincipalId)   # object id, not a secret
+            - template: pipelines/templates/steps/bicep-deployment.yml@infra
+              parameters:
+                stepLabel: Network
                 deploymentName: $(projectName)-$(environment)-network-$(Build.BuildId)
                 templateFile: bicep/stacks/10-network/main.bicep
                 serviceConnection: ${{ variables.serviceConnection }}
@@ -89,6 +105,7 @@ stages:
                   location: $(location)
             - template: pipelines/templates/steps/bicep-deployment.yml@infra
               parameters:
+                stepLabel: Data
                 deploymentName: $(projectName)-$(environment)-data-$(Build.BuildId)
                 templateFile: bicep/stacks/20-data/main.bicep
                 serviceConnection: ${{ variables.serviceConnection }}
@@ -100,6 +117,7 @@ stages:
                   location: $(location)
             - template: pipelines/templates/steps/bicep-deployment.yml@infra
               parameters:
+                stepLabel: App
                 deploymentName: $(projectName)-$(environment)-app-$(Build.BuildId)
                 templateFile: bicep/stacks/30-app/main.bicep
                 serviceConnection: ${{ variables.serviceConnection }}
